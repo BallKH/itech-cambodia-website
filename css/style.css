@@ -737,6 +737,17 @@ section { padding: 96px 0; }
   margin-bottom: 20px;
 }
 .form-success.show { display: flex; }
+.form-error {
+  display: none;
+  align-items: center; gap: 10px;
+  background: #fdecec; color: #b3261e;
+  border: 1px solid #f5c2c0;
+  padding: 14px 18px; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 600;
+  margin-bottom: 20px;
+}
+.form-error.show { display: flex; }
+.hidden-field { position: absolute; left: -9999px; opacity: 0; pointer-events: none; }
 
 .map-embed {
   border-radius: var(--radius-lg);

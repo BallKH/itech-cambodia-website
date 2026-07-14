@@ -66,13 +66,50 @@ document.addEventListener("DOMContentLoaded", () => {
     if (hash && document.getElementById(hash)) activate(hash);
   }
 
-  /* Contact form (front-end only demo) */
+  /* Contact form -> Web3Forms */
   const form = document.querySelector("#contact-form");
   if (form) {
-    form.addEventListener("submit", (e) => {
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const successEl = document.querySelector(".form-success");
+    const errorEl = document.querySelector(".form-error");
+    const originalBtnText = submitBtn?.textContent;
+
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      document.querySelector(".form-success")?.classList.add("show");
-      form.reset();
+      successEl?.classList.remove("show");
+      errorEl?.classList.remove("show");
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Sending...";
+      }
+      try {
+        const res = await fetch("https://api.web3forms.com/submit", {
+          method: "POST",
+          headers: { Accept: "application/json" },
+          body: new FormData(form),
+        });
+        let result = {};
+        try {
+          result = await res.json();
+        } catch (_) {
+          /* Web3Forms can return an HTML success page instead of JSON */
+        }
+        if (!res.ok || result.success === false) {
+          throw new Error(result.message || "Submission failed");
+        }
+        successEl?.classList.add("show");
+        form.reset();
+      } catch (err) {
+        if (errorEl) {
+          errorEl.textContent = "Something went wrong sending your message. Please try again, or email us directly at sales@itechcambodia.com.";
+          errorEl.classList.add("show");
+        }
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalBtnText;
+        }
+      }
     });
   }
 
