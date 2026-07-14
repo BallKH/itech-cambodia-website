@@ -756,14 +756,15 @@ section { padding: 96px 0; }
 }
 @media (max-width: 900px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .footer-grid { grid-template-columns: 1fr; } }
-.footer-brand .brand { color: #fff; margin-bottom: 14px; }
+.footer-brand { text-align: center; }
+.footer-brand .brand { color: #fff; margin-bottom: 14px; justify-content: center; }
 .footer-brand .brand-logo { height: 36px; }
-.footer-brand p { font-size: 14px; color: rgba(255,255,255,.5); max-width: 300px; }
+.footer-brand p { font-size: 14px; color: rgba(255,255,255,.5); max-width: 300px; margin-left: auto; margin-right: auto; }
 .footer-col h4 { color: #fff; font-size: 14.5px; margin-bottom: 18px; text-transform: uppercase; letter-spacing: .05em; }
 .footer-col ul li { margin-bottom: 11px; }
 .footer-col ul a { font-size: 14px; color: rgba(255,255,255,.55); transition: color .18s ease; }
 .footer-col ul a:hover { color: var(--orange-400); }
-.footer-col .contact-item { margin-bottom: 16px; }
+.footer-col .contact-item { margin-bottom: 16px; align-items: center; }
 .footer-col .contact-item .icon-tile { width: 34px; height: 34px; background: rgba(255,255,255,.08); color: var(--orange-400); }
 .footer-col .contact-item .icon-tile svg { width: 16px; height: 16px; }
 .footer-col .contact-item p, .footer-col .contact-item a { font-size: 13.5px; color: rgba(255,255,255,.6); font-weight: 400; }
