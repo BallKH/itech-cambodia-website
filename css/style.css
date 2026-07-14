@@ -314,13 +314,14 @@ section { padding: 96px 0; }
   gap: 36px;
   flex-wrap: wrap;
 }
+.hero-stat { text-align: center; }
 .hero-stat b {
   display: block;
   font-family: var(--font-head);
   font-size: 26px;
   color: #fff;
 }
-.hero-stat span { font-size: 13px; color: rgba(255,255,255,.55); }
+.hero-stat span { display: block; font-size: 13px; color: rgba(255,255,255,.55); }
 
 .hero-visual {
   position: relative;
