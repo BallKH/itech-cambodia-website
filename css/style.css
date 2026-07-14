@@ -749,7 +749,7 @@ section { padding: 96px 0; }
 }
 .footer-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1.2fr;
+  grid-template-columns: 1.3fr .9fr .9fr 1.5fr;
   gap: 40px;
   padding-bottom: 52px;
   border-bottom: 1px solid rgba(255,255,255,.1);
