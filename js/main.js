@@ -113,11 +113,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  /* Active nav link by current page */
-  const current = location.pathname.split("/").pop() || "index.html";
+  /* Active nav link by current page (clean-URL aware) */
+  const normalize = (p) => {
+    const clean = p.replace(/\.html$/, "").replace(/\/+$/, "");
+    return clean === "" ? "/" : clean;
+  };
+  const currentPath = normalize(location.pathname);
   document.querySelectorAll(".nav-links a").forEach((a) => {
-    const href = a.getAttribute("href");
-    if (href === current || (current === "" && href === "index.html")) {
+    const hrefPath = normalize(a.getAttribute("href").split("#")[0]);
+    if (hrefPath === currentPath) {
       a.classList.add("active");
     }
   });
