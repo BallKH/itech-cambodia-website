@@ -11,6 +11,13 @@
 // renamed to these names works fine) and every gesture in
 // robot-animation.js keeps working completely unchanged, because it only
 // ever touches `rig.bones.<name>`, never raw geometry.
+//
+// "static-glb" is the middle ground used today: a single fused (non-
+// rigged) .glb export — no per-part gestures possible (nothing to move
+// independently), but createAnimator() gives it a whole-body gesture set
+// built on the same floater/tilter wrappers every rig uses, so the public
+// API (wave/nod/celebrate/etc.) still works. Swap to a real rigged "glb"
+// the moment one exists; nothing else changes.
 
 // The canonical bone/part names every renderer (procedural rig today, a
 // loaded .glb tomorrow) must expose on `rig.bones`. robot-animation.js and
@@ -62,10 +69,12 @@ export const PART_TO_BONES = {
 
 export const CONFIG = {
   model: {
-    type: "rig", // "rig" (procedural Three.js geometry, today) | "glb" (future)
+    type: "static-glb", // "rig" (procedural) | "static-glb" (fused mesh, today) | "glb" (future rigged export)
     glbUrl: "assets/robot.glb",
+    staticGlbUrl: "assets/robot-static.glb",
+    staticGlbVersion: 1,
     // Reference-only: the flat mascot artwork the procedural rig's colors
-    // and proportions were sampled from. Not rendered once the rig is live.
+    // and proportions were sampled from. Not rendered once a glb is live.
     referencePng: "assets/Robot-V1.png",
   },
 

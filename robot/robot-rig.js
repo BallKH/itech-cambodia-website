@@ -385,3 +385,50 @@ export async function loadGlbRig(THREE, url) {
 
   return { group, bones, boundingSize: size };
 }
+
+/**
+ * Loads a single fused (non-rigged) .glb — e.g. a Blender/AI-generated
+ * export with no skeleton — as the mascot's visual. It cannot satisfy the
+ * real BONE_NAMES contract (nothing to independently move), so every bone
+ * is a harmless inert placeholder Object3D instead: gesture code in
+ * robot-animation.js can still call `bones.armR_upper.rotation...` without
+ * throwing, it just has no visible effect. `isStatic: true` tells
+ * createAnimator() to use its whole-body gesture set (built on the shared
+ * floater/tilter wrappers, same as any rig) instead of per-bone gestures.
+ *
+ * Use this for a nicer-looking placeholder while waiting on a properly
+ * rigged export; switch to loadGlbRig() the moment one exists — nothing
+ * else in the codebase needs to change either time.
+ */
+export async function loadStaticGlbRig(THREE, url) {
+  const { GLTFLoader } = await import("./vendor/GLTFLoader.js");
+  const loader = new GLTFLoader();
+  const gltf = await loader.loadAsync(url);
+  const loaded = gltf.scene || gltf.scenes[0];
+
+  loaded.traverse((obj) => {
+    if (obj.isMesh) obj.userData.part = "torso"; // any click -> a generic whole-body reaction
+  });
+
+  // The export's own origin is whatever Blender's object origin happened
+  // to be (often the feet, or an arbitrary point) — recenter the same way
+  // buildProceduralRig() does so the camera's lookAt(0,0,0) actually frames
+  // the model instead of an off-center crop.
+  const group = new THREE.Group();
+  group.add(loaded);
+  const preBox = new THREE.Box3().setFromObject(loaded);
+  loaded.position.sub(preBox.getCenter(new THREE.Vector3()));
+
+  const bones = {};
+  for (const name of BONE_NAMES) {
+    const placeholder = new THREE.Group();
+    placeholder.name = name;
+    group.add(placeholder);
+    bones[name] = placeholder;
+  }
+
+  const box = new THREE.Box3().setFromObject(group);
+  const size = box.getSize(new THREE.Vector3());
+
+  return { group, bones, boundingSize: size, materials: null, isStatic: true };
+}

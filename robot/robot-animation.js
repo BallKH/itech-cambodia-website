@@ -23,6 +23,12 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const DEG = Math.PI / 180;
 
 export function createAnimator(rig, wrappers) {
+  // A single fused (non-rigged) mesh — see robot-rig.js#loadStaticGlbRig —
+  // has no independently-movable parts, so it gets a whole-body gesture
+  // set instead of one built on per-bone rotations. Same public API
+  // either way; robot.js never needs to know which it got.
+  if (rig.isStatic) return createStaticAnimator(rig, wrappers);
+
   const { bones, materials } = rig;
   const { floater, tilter } = wrappers;
   const idleTimers = [];
@@ -496,6 +502,392 @@ export function createAnimator(rig, wrappers) {
     neckSway();
     eyeGlowPulse();
     scheduleBlink();
+    scheduleLookAround();
+    scheduleRandomEvent();
+    return { reduced: false };
+  }
+
+  function stop() {
+    idleTimers.forEach(clearTimeout);
+  }
+
+  return {
+    start, stop, setHologramHandlers,
+    blinkOnce, lookAt, returnToRest, smilePulse, eyesClose, tiltHead,
+    nod, faceReaction, wave, raiseHand, pointTo, thumbsUp, clap, bounceLaugh,
+    legReaction, jump, dance, walk, stretch, sitDown, useTablet,
+    repairServer, shieldFlash, celebrate, greetWave,
+    isBusy: () => busy,
+  };
+}
+
+// ---------------------------------------------------------------------
+// Whole-body gesture set for a single fused (non-rigged) mesh — see the
+// isStatic dispatch above. Every gesture that would normally rotate one
+// limb bone instead moves the entire model (rotation/position/scale on
+// `tilter`), the same technique the very first flat-PNG build used before
+// the skeletal rig existed. Ambient motion still lives only on `floater`
+// and reactive motion only on `tilter`, so the same infinite-vs-reactive
+// GSAP collision this file's header warns about still can't happen.
+// Anything that inherently needs separate parts (blink/eyelids, a shell
+// material to flash) is a deliberate, harmless no-op here — there is
+// nothing to move without a rig.
+function createStaticAnimator(rig, wrappers) {
+  const { floater, tilter } = wrappers;
+  const idleTimers = [];
+  let busy = false;
+  let hologramShow = null;
+  let hologramHide = null;
+
+  function withBusy(fn) {
+    busy = true;
+    const done = () => (busy = false);
+    fn(done);
+  }
+  function setHologramHandlers(show, hide) {
+    hologramShow = show;
+    hologramHide = hide;
+  }
+
+  // ---------- ambient idle (floater only) ----------
+  function floatBob() {
+    gsap.to(floater.position, { y: "+=0.05", duration: 2.6, ease: "sine.inOut", yoyo: true, repeat: -1 });
+  }
+  function breathing() {
+    gsap.to(floater.scale, { x: 1.03, y: 1.03, z: 1.03, duration: 2.1, ease: "sine.inOut", yoyo: true, repeat: -1 });
+  }
+  function idleSway() {
+    gsap.to(floater.rotation, { z: 0.035, duration: 3.6, ease: "sine.inOut", yoyo: true, repeat: -1 });
+  }
+
+  // ---------- cursor / scroll look (tilter, reactive, capped at
+  // CONFIG.camera.maxLookDeg — never more than that, same rule as the
+  // skeletal rig's head-only look, just applied to the whole model here
+  // since there's no separate head to turn) ----------
+  const maxLook = CONFIG.camera.maxLookDeg * DEG;
+  function lookAt(nx, ny) {
+    if (busy) return;
+    const yaw = Math.max(-1, Math.min(1, nx)) * maxLook;
+    const pitch = Math.max(-1, Math.min(1, ny)) * maxLook * 0.6;
+    gsap.to(tilter.rotation, { y: yaw, x: pitch, duration: 0.55, ease: "power2.out", overwrite: "auto" });
+  }
+  function returnToRest(duration = 0.6) {
+    gsap.to(tilter.rotation, { x: 0, y: 0, z: 0, duration, ease: "sine.inOut", overwrite: "auto" });
+  }
+
+  function smilePulse(holdSeconds = 0.9) {
+    gsap
+      .timeline()
+      .to(tilter.scale, { x: 1.06, y: 1.06, z: 1.06, duration: 0.2, ease: "back.out(3)" })
+      .to(tilter.scale, { x: 1, y: 1, z: 1, duration: holdSeconds, ease: "sine.inOut" });
+  }
+  function blinkOnce() {
+    /* no separate eyelid geometry on a fused mesh — nothing to blink */
+  }
+  function eyesClose() {
+    /* same reason */
+  }
+  function shieldFlash() {
+    /* no shell material reference on a static mesh to flash */
+  }
+
+  function tiltHead() {
+    withBusy((done) => {
+      audio.click();
+      const dir = Math.random() < 0.5 ? -1 : 1;
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.rotation, { z: dir * 12 * DEG, duration: 0.4, ease: "back.out(2)" })
+        .to({}, { duration: 0.6 })
+        .to(tilter.rotation, { z: 0, duration: 0.45, ease: "sine.inOut" });
+      smilePulse(1);
+    });
+  }
+
+  function nod() {
+    withBusy((done) => {
+      audio.click();
+      smilePulse();
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.rotation, { x: 12 * DEG, duration: 0.16, ease: "sine.out" })
+        .to(tilter.rotation, { x: -5 * DEG, duration: 0.14, ease: "sine.inOut" })
+        .to(tilter.rotation, { x: 0, duration: 0.18, ease: "sine.inOut" });
+    });
+  }
+
+  function faceReaction() {
+    withBusy((done) => {
+      audio.click();
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.scale, { x: 1.1, y: 0.94, z: 1.1, duration: 0.14, ease: "back.out(3)" })
+        .to(tilter.scale, { x: 1, y: 1, z: 1, duration: 0.3, ease: "elastic.out(1, 0.5)" });
+    });
+  }
+
+  function wave() {
+    withBusy((done) => {
+      audio.wave();
+      smilePulse(1.1);
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.rotation, { z: 10 * DEG, duration: 0.16, ease: "sine.inOut" })
+        .to(tilter.rotation, { z: -9 * DEG, duration: 0.16, ease: "sine.inOut", repeat: 3, yoyo: true })
+        .to(tilter.rotation, { z: 0, duration: 0.2, ease: "sine.inOut" });
+    });
+  }
+
+  function raiseHand() {
+    withBusy((done) => {
+      audio.click();
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.position, { y: "+=0.08", duration: 0.3, ease: "back.out(2)" })
+        .to(tilter.rotation, { z: 8 * DEG, duration: 0.3, ease: "back.out(2)" }, "<")
+        .to({}, { duration: 0.8 })
+        .to(tilter.position, { y: "-=0.08", duration: 0.35, ease: "sine.inOut" })
+        .to(tilter.rotation, { z: 0, duration: 0.35, ease: "sine.inOut" }, "<");
+    });
+  }
+
+  function pointTo(dirX = 1) {
+    withBusy((done) => {
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.rotation, { z: dirX * 9 * DEG, duration: 0.3, ease: "back.out(2)" })
+        .to(tilter.position, { x: dirX * 0.05, duration: 0.3, ease: "back.out(2)" }, "<")
+        .to({}, { duration: 1 })
+        .to(tilter.rotation, { z: 0, duration: 0.4, ease: "sine.inOut" })
+        .to(tilter.position, { x: 0, duration: 0.4, ease: "sine.inOut" }, "<");
+    });
+  }
+
+  function thumbsUp() {
+    withBusy((done) => {
+      audio.click();
+      smilePulse(1);
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.scale, { x: 1.08, y: 1.08, z: 1.08, duration: 0.2, ease: "back.out(2.5)" })
+        .to({}, { duration: 0.6 })
+        .to(tilter.scale, { x: 1, y: 1, z: 1, duration: 0.3, ease: "sine.inOut" });
+    });
+  }
+
+  function clap() {
+    withBusy((done) => {
+      audio.happy();
+      smilePulse(1.2);
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.scale, { x: 1.1, z: 1.1, duration: 0.09, ease: "sine.inOut", yoyo: true, repeat: 5 });
+    });
+  }
+
+  function bounceLaugh() {
+    withBusy((done) => {
+      audio.happy();
+      smilePulse(1.2);
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.scale, { y: 0.88, x: 1.08, z: 1.08, duration: 0.12, ease: "sine.in" })
+        .to(tilter.scale, { y: 1.08, x: 0.96, z: 0.96, duration: 0.14, ease: "sine.out" })
+        .to(tilter.scale, { y: 1, x: 1, z: 1, duration: 0.22, ease: "elastic.out(1, 0.4)" });
+    });
+  }
+
+  function jump() {
+    withBusy((done) => {
+      audio.click();
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.scale, { y: 0.9, duration: 0.14, ease: "sine.in" })
+        .to(tilter.position, { y: "+=0.22", duration: 0.24, ease: "power2.out" }, ">")
+        .to(tilter.scale, { y: 1.06, duration: 0.24, ease: "sine.out" }, "<")
+        .to(tilter.position, { y: "-=0.22", duration: 0.26, ease: "bounce.out" })
+        .to(tilter.scale, { y: 1, duration: 0.2, ease: "sine.out" }, "<");
+    });
+  }
+
+  function legReaction() {
+    jump();
+  }
+
+  function danceTimeline(onDone) {
+    const tl = gsap.timeline({ onComplete: onDone });
+    for (let i = 0; i < 3; i++) {
+      tl.to(tilter.rotation, { z: 10 * DEG, duration: 0.18, ease: "sine.inOut" })
+        .to(tilter.position, { y: "+=0.04", duration: 0.18, ease: "sine.inOut" }, "<")
+        .to(tilter.rotation, { z: -10 * DEG, duration: 0.18, ease: "sine.inOut" })
+        .to(tilter.position, { y: "-=0.04", duration: 0.18, ease: "sine.inOut" }, "<");
+    }
+    tl.to(tilter.rotation, { z: 0, duration: 0.25, ease: "sine.inOut" });
+    return tl;
+  }
+
+  function dance() {
+    gsap.killTweensOf(tilter.rotation);
+    gsap.killTweensOf(tilter.position);
+    withBusy((done) => {
+      audio.happy();
+      smilePulse(1.4);
+      danceTimeline(done);
+    });
+  }
+
+  function walk() {
+    withBusy((done) => {
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.position, { x: 0.07, duration: 0.4, ease: "sine.inOut" })
+        .to(tilter.rotation, { z: 4 * DEG, duration: 0.2, ease: "sine.inOut", yoyo: true, repeat: 3 }, "<")
+        .to(tilter.position, { x: -0.07, duration: 0.5, ease: "sine.inOut" })
+        .to(tilter.position, { x: 0, duration: 0.4, ease: "sine.inOut" });
+    });
+  }
+
+  function stretch() {
+    withBusy((done) => {
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.scale, { y: 1.1, duration: 0.5, ease: "sine.out" })
+        .to({}, { duration: 0.4 })
+        .to(tilter.scale, { y: 1, duration: 0.5, ease: "sine.inOut" });
+    });
+  }
+
+  function sitDown() {
+    withBusy((done) => {
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.scale, { y: 0.82, duration: 0.35, ease: "sine.out" })
+        .to(tilter.position, { y: "-=0.12", duration: 0.35, ease: "sine.out" }, "<")
+        .to({}, { duration: 1.4 })
+        .to(tilter.scale, { y: 1, duration: 0.4, ease: "sine.inOut" })
+        .to(tilter.position, { y: "+=0.12", duration: 0.4, ease: "sine.inOut" }, "<");
+    });
+  }
+
+  function useTablet(topic) {
+    withBusy((done) => {
+      audio.thinking();
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.rotation, { x: -6 * DEG, duration: 0.3, ease: "back.out(1.8)" })
+        .call(() => hologramShow && hologramShow(topic))
+        .to({}, { duration: 1.6 })
+        .call(() => hologramHide && hologramHide())
+        .to(tilter.rotation, { x: 0, duration: 0.4, ease: "sine.inOut" });
+    });
+  }
+
+  function repairServer() {
+    withBusy((done) => {
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.rotation, { z: "+=" + 4 * DEG, duration: 0.09, ease: "sine.inOut", yoyo: true, repeat: 7 })
+        .to(tilter.rotation, { z: 0, duration: 0.15 });
+    });
+  }
+
+  function celebrate(onConfetti) {
+    gsap.killTweensOf(tilter.rotation);
+    gsap.killTweensOf(tilter.position);
+    gsap.killTweensOf(tilter.scale);
+    withBusy((done) => {
+      audio.happy();
+      smilePulse(1.6);
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.position, { y: "+=0.22", duration: 0.22, ease: "power2.out" })
+        .to(tilter.rotation, { y: "+=" + Math.PI * 2, duration: 0.6, ease: "power1.inOut" }, "<")
+        .to(tilter.position, { y: "-=0.22", duration: 0.32, ease: "bounce.out" })
+        .call(() => onConfetti && onConfetti());
+    });
+  }
+
+  function greetWave() {
+    withBusy((done) => {
+      audio.hello();
+      smilePulse(1.2);
+      gsap
+        .timeline({ onComplete: done })
+        .to(tilter.rotation, { z: 9 * DEG, duration: 0.2, ease: "back.out(2)" })
+        .to(tilter.rotation, { z: -8 * DEG, duration: 0.2, ease: "sine.inOut", yoyo: true, repeat: 4 })
+        .to(tilter.rotation, { z: 0, duration: 0.3, ease: "sine.inOut" });
+    });
+  }
+
+  // ---------- random ambient events (never the same one twice in a row) ----------
+  let lastEvent = null;
+  function runRandomEvent() {
+    let evt = pick(CONFIG.randomEvents);
+    if (CONFIG.randomEvents.length > 1) {
+      while (evt === lastEvent) evt = pick(CONFIG.randomEvents);
+    }
+    lastEvent = evt;
+    switch (evt) {
+      case "wave":
+        return wave();
+      case "raiseHand":
+        return raiseHand();
+      case "smile":
+        return smilePulse(1.4);
+      case "tiltHead":
+        return tiltHead();
+      case "checkTablet":
+      case "launchHologram":
+        return useTablet(pick(CONFIG.hologramTopics));
+      case "lookAround":
+        lookAt(rand(-0.8, 0.8), rand(-0.4, 0.4));
+        return setTimeout(() => !busy && returnToRest(1), 1200);
+      case "stretch":
+        return stretch();
+      case "dance":
+        return dance();
+      case "walk":
+        return walk();
+      case "sitDown":
+        return sitDown();
+      case "repairServer":
+        return repairServer();
+      case "showShield":
+        return shieldFlash();
+      default:
+        return null;
+    }
+  }
+  function scheduleRandomEvent() {
+    const t = setTimeout(
+      () => {
+        if (!busy) runRandomEvent();
+        scheduleRandomEvent();
+      },
+      rand(CONFIG.timing.randomEventMinMs, CONFIG.timing.randomEventMaxMs)
+    );
+    idleTimers.push(t);
+  }
+
+  function scheduleLookAround() {
+    const t = setTimeout(
+      () => {
+        if (!busy && !state.cursor.active) {
+          lookAt(rand(-0.7, 0.7), rand(-0.4, 0.4));
+          setTimeout(() => !busy && !state.cursor.active && returnToRest(1), 1100);
+        }
+        scheduleLookAround();
+      },
+      rand(CONFIG.timing.lookAroundMinMs, CONFIG.timing.lookAroundMaxMs)
+    );
+    idleTimers.push(t);
+  }
+
+  function start() {
+    if (prefersReducedMotion()) return { reduced: true };
+    floatBob();
+    breathing();
+    idleSway();
     scheduleLookAround();
     scheduleRandomEvent();
     return { reduced: false };

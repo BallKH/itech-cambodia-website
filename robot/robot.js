@@ -17,7 +17,7 @@ import { state } from "./robot-state.js";
 import { audio } from "./robot-audio.js";
 import { createAnimator } from "./robot-animation.js";
 import { createSpeech } from "./robot-speech.js";
-import { buildProceduralRig, loadGlbRig } from "./robot-rig.js";
+import { buildProceduralRig, loadGlbRig, loadStaticGlbRig } from "./robot-rig.js";
 import * as THREE from "./vendor/three.module.min.js";
 
 function injectStylesheet() {
@@ -39,6 +39,12 @@ async function createRig() {
         `[iTech Robot] Couldn't use robot.glb (${err.message}) — falling back to the procedural rig. ` +
           "A valid export just needs every bone named in config.js#BONE_NAMES present in the scene graph."
       );
+    }
+  } else if (CONFIG.model.type === "static-glb") {
+    try {
+      return await loadStaticGlbRig(THREE, `${CONFIG.model.staticGlbUrl}?v=${CONFIG.model.staticGlbVersion || 1}`);
+    } catch (err) {
+      console.warn(`[iTech Robot] Couldn't load ${CONFIG.model.staticGlbUrl} (${err.message}) — falling back to the procedural rig.`);
     }
   }
   return buildProceduralRig(THREE);
