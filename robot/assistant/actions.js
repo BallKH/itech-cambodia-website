@@ -1,44 +1,31 @@
-// iTech Cambodia — AI website assistant — action dispatcher
-// Translates the structured `action` object /api/assistant returns (or a
-// local fallback built straight from search.js's top hit) into a
-// navigation.js call. Keeps chat.js from needing to know any DOM details.
+// iTech Cambodia — AI website assistant — action dispatcher (V2)
+// Translates the OpenAI function call /api/assistant returns — real
+// function-calling now, matching the `name`/args OpenAI sends, not a
+// hand-rolled JSON action contract — into a navigation.js call. Keeps
+// chat.js from needing to know any DOM details.
 
-import {
-  navigateTo,
-  scrollToSection,
-  highlightCard,
-  openAccordion,
-  openContactForm,
-  showService,
-  focusAssistantInput,
-} from "./navigation.js";
+import { navigateTo, scrollToSection, highlightCard, openContactForm } from "./navigation.js";
+import { logger } from "./logger.js";
 
 /** @param {{type: string, page?: string, section?: string} | null} action */
 export function runAction(action) {
   if (!action || !action.type) return;
+  logger.debug("running action", action.type, action.page, action.section);
   switch (action.type) {
-    case "navigate":
+    case "navigateTo":
       navigateTo(action.page, action.section);
       break;
-    case "scroll":
+    case "scrollTo":
       scrollToSection(action.section);
       break;
-    case "highlight":
+    case "highlightService":
       highlightCard(action.section);
       break;
-    case "accordion":
-      openAccordion(action.section);
-      break;
-    case "contact":
+    case "openContactForm":
       openContactForm();
       break;
-    case "service":
-      showService(action.section);
-      break;
-    case "focusSearch":
-      focusAssistantInput();
-      break;
     default:
+      logger.warn("unknown action type", action.type);
       break;
   }
 }
@@ -48,5 +35,5 @@ export function runAction(action) {
  * lets the robot navigate even without spending an API call. */
 export function actionFromSearchResult(result) {
   if (!result) return null;
-  return { type: "navigate", page: result.page, section: result.anchor || undefined };
+  return { type: "navigateTo", page: result.page, section: result.anchor || undefined };
 }

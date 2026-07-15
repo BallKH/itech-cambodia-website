@@ -1,10 +1,16 @@
-// iTech Cambodia — AI website assistant — lexical site search
-// Scores every indexed entry (see website-index.js) against the visitor's
-// query using plain keyword/synonym overlap — no embeddings, no vector
-// store, zero extra API cost per query. Good enough for a handful of pages;
-// the final answer's actual language understanding comes from the OpenAI
-// call in chat.js, which only ever sees the top few candidates this file
-// returns, never the whole site.
+// iTech Cambodia — AI website assistant — automatic lexical search (V2)
+// Replaces V1's hand-maintained synonym list with statistics computed
+// directly from the site's own indexed content: classic TF-IDF over the
+// entries scripts/build_website_index.py extracts. No manual keyword
+// curation, no embeddings/vector store, zero extra API cost per query —
+// the corpus is small enough (under 100 entries) that this runs in
+// microseconds in the browser.
+//
+// Automatic light stemming (plurals/-ing/-ed suffix stripping) is the one
+// generalization applied on top of raw tokens — still purely mechanical,
+// not a domain-specific synonym table.
+
+import { ASSISTANT_CONFIG } from "./assistant-config.js";
 
 const STOPWORDS = new Set([
   "a", "an", "the", "is", "are", "am", "do", "does", "did", "you", "your", "yours", "i", "we", "our", "ours",
@@ -13,52 +19,34 @@ const STOPWORDS = new Set([
   "where", "when", "who", "which", "there", "here", "this", "that", "these", "those", "it", "be", "any",
 ]);
 
-// Small domain synonym groups so "cybersecurity", "security" and "cyber"
-// all expand to hit the same content, without needing embeddings. Every
-// term here must be a single tokenize()-able word — the indexed text is
-// tokenized by whitespace, so "Trend Micro" becomes two tokens ("trend",
-// "micro"), never "trendmicro". Multi-word product names are listed as
-// their separate real words for that reason.
-const SYNONYM_GROUPS = [
-  ["cybersecurity", "security", "cyber", "firewall", "antivirus", "kaspersky", "trend", "micro"],
-  ["cloud", "azure", "aws", "digitalocean", "google", "workspace", "hybrid"],
-  ["networking", "network", "sdwan", "routing", "switching", "wireless", "wifi", "vpn"],
-  ["virtualization", "vmware", "hyperconverged", "hci", "server", "storage"],
-  ["surveillance", "cctv", "access", "control", "elv"],
-  ["support", "helpdesk", "managed", "maintenance"],
-  ["contact", "reach", "talk", "consultation", "quote", "call", "email", "office", "address", "phone"],
-  ["about", "company", "who"],
-  ["customers", "clients", "portfolio", "case", "studies", "success"],
-  ["partners", "partnership", "vendor", "ecosystem"],
-  ["software", "development", "app", "erp", "crm", "sap", "saas", "integration"],
-  ["ai", "artificial", "intelligence", "business", "bi"],
-  ["microsoft", "office", "365", "m365", "dynamics", "sharepoint", "teams"],
-  ["backup", "disaster", "recovery", "dr", "continuity"],
-  ["industries", "sectors", "manufacturing", "healthcare", "logistics"],
-];
-const SYNONYM_MAP = new Map();
-for (const group of SYNONYM_GROUPS) {
-  for (const term of group) SYNONYM_MAP.set(term, group);
-}
+const HEADING_WEIGHT = 2.5;
+const TITLE_WEIGHT = 1.5;
+const TYPE_WEIGHT = { meta: 1.6, service: 1.3, card: 1.1, faq: 1.4, panel: 1.1, section: 1 };
 
 function normalizeToken(t) {
   return t.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function tokenize(text) {
-  return text
-    .split(/\s+/)
-    .map(normalizeToken)
-    .filter((t) => t.length > 1 && !STOPWORDS.has(t));
+/** Very small mechanical stemmer — strips common English suffixes so
+ * "networks"/"networking" both reduce toward "network" without a
+ * hand-written synonym table. Intentionally conservative to avoid
+ * collapsing unrelated words together. */
+function stem(word) {
+  if (word.length <= 3) return word;
+  if (word.endsWith("ies") && word.length > 5) return word.slice(0, -3) + "y";
+  if (word.endsWith("ing") && word.length > 6) return word.slice(0, -3);
+  if (word.endsWith("ed") && word.length > 5) return word.slice(0, -2);
+  if (word.endsWith("es") && word.length > 5) return word.slice(0, -2);
+  if (word.endsWith("s") && !word.endsWith("ss") && word.length > 4) return word.slice(0, -1);
+  return word;
 }
 
-function expandTokens(tokens) {
-  const set = new Set(tokens);
-  for (const t of tokens) {
-    const group = SYNONYM_MAP.get(t);
-    if (group) for (const g of group) set.add(g);
-  }
-  return set;
+function tokenize(text) {
+  return (text || "")
+    .split(/\s+/)
+    .map(normalizeToken)
+    .filter((t) => t.length > 1 && !STOPWORDS.has(t))
+    .map(stem);
 }
 
 function flattenIndex(index) {
@@ -69,6 +57,7 @@ function flattenIndex(index) {
         page: page.url,
         pageTitle: page.title,
         anchor: entry.anchor,
+        type: entry.type || "section",
         heading: entry.heading || "",
         text: entry.text || "",
       });
@@ -77,37 +66,61 @@ function flattenIndex(index) {
   return rows;
 }
 
-function scoreRow(row, queryTokens, rawQuery) {
-  const headingTokens = tokenize(row.heading);
-  const textTokens = tokenize(row.text);
-  const titleTokens = tokenize(row.pageTitle);
+/** Builds (and caches on the index object itself) the TF-IDF model: each
+ * row's weighted term-frequency map, plus corpus-wide document frequency. */
+function buildModel(index) {
+  if (index.__tfidfModel) return index.__tfidfModel;
+
+  const rows = flattenIndex(index);
+  const titleTokens = new Map(); // page url -> Set(tokens), computed once per page
+  const docFreq = new Map();
+
+  const docs = rows.map((row) => {
+    const tf = new Map();
+    const add = (tokens, weight) => {
+      for (const t of tokens) tf.set(t, (tf.get(t) || 0) + weight);
+    };
+    add(tokenize(row.text), 1);
+    add(tokenize(row.heading), HEADING_WEIGHT);
+
+    if (!titleTokens.has(row.page)) titleTokens.set(row.page, tokenize(row.pageTitle));
+    add(titleTokens.get(row.page), TITLE_WEIGHT);
+
+    for (const term of tf.keys()) docFreq.set(term, (docFreq.get(term) || 0) + 1);
+    return { row, tf };
+  });
+
+  const n = docs.length || 1;
+  const idf = new Map();
+  for (const [term, df] of docFreq) idf.set(term, Math.log((n + 1) / (df + 1)) + 1);
+
+  const model = { docs, idf };
+  Object.defineProperty(index, "__tfidfModel", { value: model, enumerable: false });
+  return model;
+}
+
+function scoreDoc(doc, idf, queryTokens) {
   let score = 0;
   for (const qt of queryTokens) {
-    if (headingTokens.includes(qt)) score += 3;
-    if (titleTokens.includes(qt)) score += 2;
-    // count occurrences in body text, capped so one keyword-stuffed entry
-    // can't dominate every query
-    const occurrences = textTokens.filter((t) => t === qt).length;
-    score += Math.min(occurrences, 3);
+    const tf = doc.tf.get(qt);
+    if (!tf) continue;
+    score += tf * (idf.get(qt) || 0);
   }
-  const haystack = `${row.heading} ${row.text}`.toLowerCase();
-  if (rawQuery.length > 3 && haystack.includes(rawQuery)) score += 5;
-  return score;
+  return score * (TYPE_WEIGHT[doc.row.type] || 1);
 }
 
 /**
- * Returns the top `limit` entries for a natural-language query, each with a
- * `score` (0 = no match at all). Callers gate "out of scope" on
- * results[0]?.score being below a threshold.
+ * Returns the top `limit` entries for a natural-language query, each with
+ * a `score` (0 = no term overlap at all). Callers gate "out of scope" on
+ * results[0]?.score against ASSISTANT_CONFIG.search.relevanceThreshold.
  */
-export function search(query, index, limit = 5) {
-  const rawQuery = (query || "").trim().toLowerCase();
-  const queryTokens = [...expandTokens(tokenize(rawQuery))];
+export function search(query, index, limit = ASSISTANT_CONFIG.search.topN) {
+  const queryTokens = tokenize(query);
   if (!queryTokens.length) return [];
 
-  const rows = flattenIndex(index);
-  const scored = rows
-    .map((row) => ({ ...row, score: scoreRow(row, queryTokens, rawQuery) }))
+  const { docs, idf } = buildModel(index);
+  const scored = docs
+    .map(({ row, tf }) => ({ ...row, score: scoreDoc({ row, tf }, idf, queryTokens) }))
     .filter((row) => row.score > 0)
     .sort((a, b) => b.score - a.score);
 

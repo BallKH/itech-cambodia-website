@@ -9,6 +9,7 @@
 
 import { ask } from "./chat.js";
 import { supportsVoiceInput, listenOnce } from "./voice.js";
+import { getHistory } from "./memory.js";
 
 function injectStylesheet() {
   const href = new URL("./assistant.css", import.meta.url).href;
@@ -95,7 +96,14 @@ function buildWidget(container) {
     pending.classList.add("pending");
     window.iTechRobot?.nod();
     try {
-      const { reply } = await ask(query);
+      const { reply } = await ask(query, {
+        onDelta: (partial) => {
+          if (!partial) return;
+          pending.classList.remove("pending");
+          pending.textContent = partial;
+          log.scrollTop = log.scrollHeight;
+        },
+      });
       pending.textContent = reply;
       pending.classList.remove("pending");
       window.iTechRobot?.speak(reply, 1400);
@@ -134,7 +142,12 @@ function buildWidget(container) {
     });
   }
 
-  addMsg("robot", "Hi! Ask me about our services, or tell me where you'd like to go.");
+  const priorTurns = getHistory();
+  if (priorTurns.length) {
+    for (const turn of priorTurns) addMsg(turn.role === "user" ? "visitor" : "robot", turn.content);
+  } else {
+    addMsg("robot", "Hi! Ask me about our services, or tell me where you'd like to go.");
+  }
 }
 
 function boot() {

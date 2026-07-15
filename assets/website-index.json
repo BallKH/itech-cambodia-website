@@ -1,77 +1,97 @@
 {
-  "generatedAt": "2026-07-15T08:11:46Z",
+  "generatedAt": "2026-07-15T09:12:02Z",
   "pages": [
     {
       "url": "index.html",
       "title": "iTech Cambodia | Digital Yours — IT Infrastructure & Digital Transformation Partner",
       "entries": [
         {
+          "anchor": null,
+          "type": "meta",
+          "heading": "",
+          "text": "iTech Cambodia is a specialized IT consulting firm delivering IT infrastructure, data center & cloud, and digital transformation solutions for businesses across Cambodia."
+        },
+        {
           "anchor": "hero",
+          "type": "section",
           "heading": "We turn IT complexity into Digital Yours.",
           "text": "iTech Cambodia designs, deploys and manages secure, scalable IT infrastructure, cloud, and digital solutions for SMBs, enterprises, and government organizations across Cambodia. Talk to a Consultant Explore Services 15+Industries served 25+Technology partners 3Core solution pillars 100%Cambodia-based support Also covering CCTV & Access Backup & DR ERP System AI Solution Business Intelligence SIEM Solution Cloud & DC Networking Cybersecurity Software Dev"
         },
         {
           "anchor": "services",
+          "type": "card",
           "heading": "IT Infrastructure",
           "text": "Enterprise networking, SD-WAN, routing & switching, wireless, firewall, VPN, ELV, CCTV and access control."
         },
         {
           "anchor": "services",
+          "type": "card",
           "heading": "Data Center & Cloud",
           "text": "Servers, HCI, virtualization, storage, Microsoft Azure/365, AWS, DigitalOcean, Google Workspace, backup & DR."
         },
         {
           "anchor": "services",
+          "type": "card",
           "heading": "Digital Solutions",
           "text": "Software development, ERP, CRM, AI solutions, system integration, SaaS, business intelligence & cybersecurity. About iTech Cambodia"
         },
         {
           "anchor": "about",
+          "type": "section",
           "heading": "A specialized IT consulting & implementation partner",
           "text": "We deliver end-to-end technology services — enterprise networking, server & storage, virtualization, HCI, cloud computing, software development, system integration, business analytics, cybersecurity, managed IT services, ELV systems and modern data center design — for SMBs, large enterprises and government organizations across Cambodia. Our industry experience spans manufacturing, financial services, hospitality, healthcare, construction, education, retail, logistics, transportation, F&B, telecommunications and government agencies. More About Us Why iTech Cambodia"
         },
         {
           "anchor": "why-itech",
+          "type": "section",
           "heading": "Reliable technology, delivered with a customer-first approach",
           "text": "Innovative, secure and scalable solutions — backed by certified engineers who understand your business."
         },
         {
           "anchor": "why-itech",
+          "type": "card",
           "heading": "Secure by Design",
           "text": "High-availability, secure environments aligned to your compliance and business objectives."
         },
         {
           "anchor": "why-itech",
+          "type": "card",
           "heading": "Certified Engineers",
           "text": "Experienced consultants and certified engineers across networking, cloud, and software."
         },
         {
           "anchor": "why-itech",
+          "type": "card",
           "heading": "Long-Term Partnership",
           "text": "Managed services and ongoing support that scale with your growth, not just a one-time project. Trusted Ecosystem"
         },
         {
           "anchor": "partners",
+          "type": "section",
           "heading": "Backed by world-class technology partners",
           "text": "Cisco Microsoft Dell EMC Fortinet HIKVISION Dahua HP VMware MikroTik Kaspersky View All Partners"
         },
         {
           "anchor": "contact",
+          "type": "section",
           "heading": "Ready to modernize your IT infrastructure?",
           "text": "Let's discuss your project — from network design to cloud migration and custom software. Get a Free Consultation sales@itechcambodia.com iTech CambodiaDigital Yours Your Trusted IT Infrastructure & Digital Transformation Partner across Cambodia."
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Company",
           "text": "About Us Our Services Our Partners Our Customers"
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Solutions",
           "text": "IT Infrastructure Data Center & Cloud Digital Solutions Get a Quote"
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Contact",
           "text": "#B113, Sangkat Krang Thnung,Khan Sen Sok, Phnom Penh, Cambodia (+855) 93 22 77 46 sales@itechcambodia.com © iTech Cambodia Co., Ltd. All rights reserved. www.itechcambodia.com"
         }
@@ -83,81 +103,103 @@
       "entries": [
         {
           "anchor": null,
+          "type": "meta",
+          "heading": "",
+          "text": "iTech Cambodia is a specialized IT consulting firm and technology implementation partner delivering IT infrastructure and digital transformation solutions across Cambodia."
+        },
+        {
+          "anchor": null,
+          "type": "section",
           "heading": "Who is iTech Cambodia?",
           "text": "Your Trusted IT Infrastructure & Digital Transformation Partner — helping organizations across Cambodia modernize, secure, and scale their technology. Who We Are"
         },
         {
           "anchor": "about",
+          "type": "section",
           "heading": "A specialized IT consulting firm and technology implementation partner",
           "text": "iTech Cambodia is a specialized IT consulting firm and technology implementation partner delivering comprehensive IT infrastructure and digital transformation solutions for small and medium-sized businesses (SMBs), large enterprises, and government organizations across Cambodia. Our team of experienced consultants and certified engineers provides end-to-end technology services, including enterprise network infrastructure, server and storage solutions, virtualization, hyper-converged infrastructure (HCI), cloud computing, microservices architecture, software development, system integration, reporting and business analytics, cybersecurity, managed IT services, ELV systems, and modern data cent"
         },
         {
           "anchor": "vision-mission",
+          "type": "section",
           "heading": "Vision, Mission & Core Values",
           "text": ""
         },
         {
           "anchor": "vision-mission",
+          "type": "card",
           "heading": "Vision",
           "text": "To empower businesses with innovative, secure, and scalable technology solutions that accelerate digital transformation and sustainable growth."
         },
         {
           "anchor": "vision-mission",
+          "type": "card",
           "heading": "Mission",
           "text": "To provide world-class IT consulting, infrastructure, cybersecurity, cloud, software, and managed services that enable organizations to achieve operational excellence."
         },
         {
           "anchor": "vision-mission",
+          "type": "card",
           "heading": "Core Value",
           "text": "We are committed to delivering innovative, secure, and reliable technology solutions with integrity, excellence, and a customer-first approach. What Sets Us Apart"
         },
         {
           "anchor": "why-choose-us",
+          "type": "section",
           "heading": "Why organizations choose iTech Cambodia",
           "text": ""
         },
         {
           "anchor": "why-choose-us",
+          "type": "card",
           "heading": "End-to-End Expertise",
           "text": "From network design to cloud migration and custom software — one partner for your entire technology stack."
         },
         {
           "anchor": "why-choose-us",
+          "type": "card",
           "heading": "Secure & High-Availability",
           "text": "Designed and managed to align with compliance requirements and business continuity objectives."
         },
         {
           "anchor": "why-choose-us",
+          "type": "card",
           "heading": "Certified Engineers",
           "text": "Experienced consultants and certified engineers across networking, cloud, cybersecurity and software."
         },
         {
           "anchor": "why-choose-us",
+          "type": "card",
           "heading": "Customer-First Approach",
           "text": "Long-term partnership and managed support that scales with your growth — not a one-time project. Industries We Serve"
         },
         {
           "anchor": "industries",
+          "type": "section",
           "heading": "Trusted across every major sector in Cambodia",
           "text": "Manufacturing Financial Services Hospitality Healthcare Construction Education Retail Logistics Transportation Restaurants & Coffee Chains Telecommunications Government Agencies"
         },
         {
           "anchor": "contact",
+          "type": "section",
           "heading": "Let's build your digital transformation roadmap",
           "text": "Speak with our consultants about your infrastructure, cloud, or software goals. Contact Us View Our Services iTech CambodiaDigital Yours Your Trusted IT Infrastructure & Digital Transformation Partner across Cambodia."
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Company",
           "text": "About Us Our Services Our Partners Our Customers"
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Solutions",
           "text": "IT Infrastructure Data Center & Cloud Digital Solutions Get a Quote"
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Contact",
           "text": "#B113, Sangkat Krang Thnung,Khan Sen Sok, Phnom Penh, Cambodia (+855) 93 22 77 46 sales@itechcambodia.com © iTech Cambodia Co., Ltd. All rights reserved. www.itechcambodia.com"
         }
@@ -168,97 +210,122 @@
       "title": "Our Services | iTech Cambodia",
       "entries": [
         {
+          "anchor": null,
+          "type": "meta",
+          "heading": "",
+          "text": "IT Infrastructure, Data Center & Cloud, and Digital Solutions — enterprise networking, cybersecurity, cloud, software development, ERP, CRM, AI and more."
+        },
+        {
           "anchor": "services",
+          "type": "section",
           "heading": "End-to-end technology services",
           "text": "Three solution pillars covering IT infrastructure, data center & cloud, and digital solutions — designed, deployed and managed by certified engineers. 1IT Infrastructure 2Data Center & Cloud 3Digital Solutions"
         },
         {
           "anchor": "it-infrastructure",
+          "type": "service",
           "heading": "IT Infrastructure",
           "text": "Enterprise networking, security, and physical infrastructure built for reliability and scale. Enterprise Networking Data Centre SD-WAN Routing & Switching Wireless Firewall VPN ELV CCTV Access Control"
         },
         {
           "anchor": "data-cloud",
+          "type": "service",
           "heading": "Data Center & Cloud",
           "text": "Servers, virtualization, storage and cloud platforms — from on-premise to hybrid and multi-cloud. Server Virtualization Storage Microsoft Azure Microsoft 365 AWS DigitalOcean Google Workspace Business Central Backup & DR"
         },
         {
           "anchor": "digital-solutions",
+          "type": "service",
           "heading": "Digital Solutions",
           "text": "Software, enterprise applications, AI and security services that drive digital transformation. Software Development ERP System CRM System AI Solution System Integration SaaS Business Intelligence Cyber Security SIEM Solution IT Consultant"
         },
         {
           "anchor": "digital-solutions",
+          "type": "service",
           "heading": "Our Software Development Cycle",
           "text": "1"
         },
         {
           "anchor": "digital-solutions",
+          "type": "service",
           "heading": "Planning",
           "text": "Define scope & goals 2"
         },
         {
           "anchor": "digital-solutions",
+          "type": "service",
           "heading": "Analysis",
           "text": "Understand requirements 3"
         },
         {
           "anchor": "digital-solutions",
+          "type": "service",
           "heading": "Design",
           "text": "Architecture & UX 4"
         },
         {
           "anchor": "digital-solutions",
+          "type": "service",
           "heading": "Implementation",
           "text": "Build the solution 5"
         },
         {
           "anchor": "digital-solutions",
+          "type": "service",
           "heading": "Testing & Integration",
           "text": "Quality assurance 6"
         },
         {
           "anchor": "digital-solutions",
+          "type": "service",
           "heading": "Maintenance",
           "text": "Support & iterate Platforms We Work With"
         },
         {
           "anchor": "platforms",
+          "type": "section",
           "heading": "Microsoft 365, Google Workspace & Microsoft Dynamics 365",
           "text": "Certified to design, migrate and manage your productivity, collaboration and ERP platforms."
         },
         {
           "anchor": "platforms",
+          "type": "card",
           "heading": "Microsoft 365",
           "text": "Teams, Exchange, SharePoint, OneDrive, Word, Excel and the full productivity suite — deployed and managed securely."
         },
         {
           "anchor": "platforms",
+          "type": "card",
           "heading": "Google Workspace",
           "text": "Gmail, Drive, Docs, Meet, Calendar and Chat — collaborative cloud tools for modern teams."
         },
         {
           "anchor": "platforms",
+          "type": "card",
           "heading": "Microsoft Dynamics 365",
           "text": "Financial, project, operations, supply chain, sales & service management, and reporting & analytics in one ERP."
         },
         {
           "anchor": "consultation-cta",
+          "type": "section",
           "heading": "Not sure which solution fits your business?",
           "text": "Our consultants will assess your environment and recommend the right roadmap. Request a Consultation iTech CambodiaDigital Yours Your Trusted IT Infrastructure & Digital Transformation Partner across Cambodia."
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Company",
           "text": "About Us Our Services Our Partners Our Customers"
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Solutions",
           "text": "IT Infrastructure Data Center & Cloud Digital Solutions Get a Quote"
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Contact",
           "text": "#B113, Sangkat Krang Thnung,Khan Sen Sok, Phnom Penh, Cambodia (+855) 93 22 77 46 sales@itechcambodia.com © iTech Cambodia Co., Ltd. All rights reserved. www.itechcambodia.com"
         }
@@ -269,42 +336,56 @@
       "title": "Our Partners | iTech Cambodia",
       "entries": [
         {
+          "anchor": null,
+          "type": "meta",
+          "heading": "",
+          "text": "iTech Cambodia partners with leading global technology brands including Cisco, Microsoft, Dell EMC, Fortinet, HIKVISION, HP, VMware and more."
+        },
+        {
           "anchor": "partners",
+          "type": "section",
           "heading": "A trusted ecosystem of global technology brands",
           "text": "We partner with industry-leading vendors to deliver best-fit, vendor-neutral solutions across networking, security, data center, cloud and business applications. Networking & Security"
         },
         {
           "anchor": "partners-networking",
+          "type": "section",
           "heading": "Enterprise networking, firewall & surveillance",
           "text": "Cisco Fortinet MikroTik Ubiquiti Networks HIKVISION Dahua Technology Bosch ZKTeco Suprema Zycoo CommScope Keystone Cable Data Center, Cloud & Software"
         },
         {
           "anchor": "partners-datacenter",
+          "type": "section",
           "heading": "Infrastructure, productivity & business platforms",
           "text": "Microsoft Dell EMC HP VMware Synology Trend Micro Kaspersky Adobe Intuit QuickBooks Grandstream Jabra ClickShare Facilities & Physical Infrastructure"
         },
         {
           "anchor": "partners-facilities",
+          "type": "section",
           "heading": "Power, cooling & safety systems",
           "text": "Panasonic Daikin APC Schneider Electric Kidde LiOA"
         },
         {
           "anchor": "become-partner",
+          "type": "section",
           "heading": "Interested in becoming a partner?",
           "text": "We're always open to expanding our technology ecosystem. Reach out to discuss a partnership. Contact Our Team iTech CambodiaDigital Yours Your Trusted IT Infrastructure & Digital Transformation Partner across Cambodia."
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Company",
           "text": "About Us Our Services Our Partners Our Customers"
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Solutions",
           "text": "IT Infrastructure Data Center & Cloud Digital Solutions Get a Quote"
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Contact",
           "text": "#B113, Sangkat Krang Thnung,Khan Sen Sok, Phnom Penh, Cambodia (+855) 93 22 77 46 sales@itechcambodia.com © iTech Cambodia Co., Ltd. All rights reserved. www.itechcambodia.com"
         }
@@ -315,57 +396,74 @@
       "title": "Our Customers | iTech Cambodia",
       "entries": [
         {
+          "anchor": null,
+          "type": "meta",
+          "heading": "",
+          "text": "Organizations across jewelry, logistics, healthcare, automotive and garment industries trust iTech Cambodia for their IT infrastructure and digital transformation."
+        },
+        {
           "anchor": "customers",
+          "type": "section",
           "heading": "Organizations that trust iTech Cambodia",
           "text": "From jewelry and logistics to healthcare, automotive and garment manufacturing — we support businesses across Cambodia's most active industries."
         },
         {
           "anchor": "customers-grid",
+          "type": "card",
           "heading": "Cheang Bak Van Hong",
           "text": "Jewelry"
         },
         {
           "anchor": "customers-grid",
+          "type": "card",
           "heading": "Cambo Link 21 Express Co., Ltd",
           "text": "Logistics & Express Delivery"
         },
         {
           "anchor": "customers-grid",
+          "type": "card",
           "heading": "Dynamic Argon",
           "text": "Healthcare"
         },
         {
           "anchor": "customers-grid",
+          "type": "card",
           "heading": "RMA Group",
           "text": "Automotive & Distribution"
         },
         {
           "anchor": "customers-grid",
+          "type": "card",
           "heading": "SR Auto",
           "text": "Automotive"
         },
         {
           "anchor": "customers-grid",
+          "type": "card",
           "heading": "TK Garment",
           "text": "Manufacturing Thank You"
         },
         {
           "anchor": "customers-thanks",
+          "type": "section",
           "heading": "Thank you for trusting iTech Cambodia with your technology journey",
           "text": "We look forward to building long-term partnerships with more organizations across Cambodia. Become Our Next Success Story iTech CambodiaDigital Yours Your Trusted IT Infrastructure & Digital Transformation Partner across Cambodia."
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Company",
           "text": "About Us Our Services Our Partners Our Customers"
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Solutions",
           "text": "IT Infrastructure Data Center & Cloud Digital Solutions Get a Quote"
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Contact",
           "text": "#B113, Sangkat Krang Thnung,Khan Sen Sok, Phnom Penh, Cambodia (+855) 93 22 77 46 sales@itechcambodia.com © iTech Cambodia Co., Ltd. All rights reserved. www.itechcambodia.com"
         }
@@ -376,52 +474,68 @@
       "title": "Contact Us | iTech Cambodia",
       "entries": [
         {
+          "anchor": null,
+          "type": "meta",
+          "heading": "",
+          "text": "Get in touch with iTech Cambodia — Head Office in Phnom Penh. Call (+855) 93 22 77 46 or email sales@itechcambodia.com."
+        },
+        {
           "anchor": "contact",
+          "type": "section",
           "heading": "Let's talk about your next IT project",
           "text": "Reach out for a free consultation — our team typically responds within one business day."
         },
         {
           "anchor": "contact-info",
+          "type": "card",
           "heading": "Head Office",
           "text": ""
         },
         {
           "anchor": "contact-info",
+          "type": "card",
           "heading": "Address",
           "text": "#B113, Sangkat Krang Thnung, Khan Sen Sok, Phnom Penh, Cambodia"
         },
         {
           "anchor": "contact-info",
+          "type": "card",
           "heading": "Phone",
           "text": "(+855) 93 22 77 46(+855) 68 22 77 46"
         },
         {
           "anchor": "contact-info",
+          "type": "card",
           "heading": "Email",
           "text": "sales@itechcambodia.com"
         },
         {
           "anchor": "contact-info",
+          "type": "card",
           "heading": "Website",
           "text": "www.itechcambodia.com"
         },
         {
           "anchor": "contact-info",
+          "type": "card",
           "heading": "Send us a message",
           "text": "Tell us about your project and we'll get back to you shortly. Thanks! Your message has been sent — we'll be in touch soon. Full Name Company Email Phone Service of Interest IT Infrastructure Data Center & Cloud Digital Solutions Managed Services Other Message Send Message By submitting, you agree to be contacted by iTech Cambodia regarding your inquiry. iTech CambodiaDigital Yours Your Trusted IT Infrastructure & Digital Transformation Partner across Cambodia."
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Company",
           "text": "About Us Our Services Our Partners Our Customers"
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Solutions",
           "text": "IT Infrastructure Data Center & Cloud Digital Solutions Get a Quote"
         },
         {
           "anchor": null,
+          "type": "section",
           "heading": "Contact",
           "text": "#B113, Sangkat Krang Thnung,Khan Sen Sok, Phnom Penh, Cambodia (+855) 93 22 77 46 sales@itechcambodia.com © iTech Cambodia Co., Ltd. All rights reserved. www.itechcambodia.com"
         }

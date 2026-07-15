@@ -89,6 +89,8 @@ async function boot() {
   renderer.setClearColor(0x000000, 0);
   canvasHost.appendChild(renderer.domElement);
 
+  // Key + fill + a subtle rim/back light (from behind-above, cool cyan-white
+  // tint) so the shell reads with more depth instead of flat front lighting.
   scene.add(new THREE.HemisphereLight(0xffffff, 0x2c3450, 1.15));
   const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
   keyLight.position.set(1.1, 1.6, 2.2);
@@ -96,6 +98,9 @@ async function boot() {
   const fillLight = new THREE.DirectionalLight(0xdbe9ff, 0.35);
   fillLight.position.set(-1.4, 0.5, 1.2);
   scene.add(fillLight);
+  const rimLight = new THREE.DirectionalLight(0x8fe3ff, 0.4);
+  rimLight.position.set(-0.6, 1.4, -1.8);
+  scene.add(rimLight);
 
   const rig = await createRig();
 

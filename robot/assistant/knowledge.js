@@ -3,14 +3,14 @@
 // sent to /api/assistant. This is the ONLY website content that ever
 // reaches OpenAI — never the full site, never raw HTML.
 
-// Below this lexical score, the visitor's query didn't meaningfully match
+import { ASSISTANT_CONFIG } from "./assistant-config.js";
+
+// Below this TF-IDF score, the visitor's query didn't meaningfully match
 // anything on the site — skip the OpenAI call entirely (faster, and avoids
 // spending API budget on off-topic questions per the "no unnecessary API
 // calls" requirement) and answer with the canned out-of-scope reply.
-const RELEVANCE_THRESHOLD = 3;
-
 export function isOutOfScope(results) {
-  return !results.length || results[0].score < RELEVANCE_THRESHOLD;
+  return !results.length || results[0].score < ASSISTANT_CONFIG.search.relevanceThreshold;
 }
 
 export function buildContext(results) {
@@ -18,7 +18,7 @@ export function buildContext(results) {
     .map((r, i) => {
       const loc = r.anchor ? `${r.page}#${r.anchor}` : r.page;
       const heading = r.heading ? ` — ${r.heading}` : "";
-      return `[${i + 1}] ${r.pageTitle}${heading} (${loc})\n${r.text}`;
+      return `[${i + 1}] (${r.type || "section"}) ${r.pageTitle}${heading} (${loc})\n${r.text}`;
     })
     .join("\n\n");
 }

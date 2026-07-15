@@ -341,7 +341,12 @@ export function buildProceduralRig(THREE) {
   rigRoot.position.sub(center);
   const size = box.getSize(new THREE.Vector3());
 
-  return { group, bones, boundingSize: size, materials: { shell, shellShadow, tabletScreen: tabletScreenMat } };
+  return {
+    group,
+    bones,
+    boundingSize: size,
+    materials: { shell, shellShadow, tabletScreen: tabletScreenMat, eyeGlow: eyeGlowMat },
+  };
 }
 
 /**

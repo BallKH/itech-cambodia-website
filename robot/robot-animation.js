@@ -112,6 +112,21 @@ export function createAnimator(rig, wrappers) {
   function breathing() {
     gsap.to(bones.torso.scale, { y: 1.045, x: 1.02, z: 1.02, duration: 1.9, ease: "sine.inOut", yoyo: true, repeat: -1 });
   }
+  // Slow, tiny head-tilt-like drift for an "alive, not frozen" read. Lives
+  // on neck.rotation.z specifically — lookAt/returnToRest/tiltHead/nod only
+  // ever touch neck.rotation.y and head.rotation.x/z, so this can't collide
+  // with any reactive gesture the way an infinite + reactive tween sharing
+  // the same property would (see file header).
+  function neckSway() {
+    gsap.to(bones.neck.rotation, { z: 0.035, duration: 3.4, ease: "sine.inOut", yoyo: true, repeat: -1 });
+  }
+  // Subtle "breathing" glow across every cyan-accent mesh that shares
+  // eyeGlowMat (eyes, ear rings, foot lights) — a slow emissive pulse
+  // instead of a static-brightness glow.
+  function eyeGlowPulse() {
+    if (!materials?.eyeGlow) return;
+    gsap.to(materials.eyeGlow, { emissiveIntensity: 1.05, duration: 2.2, ease: "sine.inOut", yoyo: true, repeat: -1 });
+  }
 
   function scheduleBlink() {
     const t = setTimeout(() => {
@@ -478,6 +493,8 @@ export function createAnimator(rig, wrappers) {
     }
     floatBob();
     breathing();
+    neckSway();
+    eyeGlowPulse();
     scheduleBlink();
     scheduleLookAround();
     scheduleRandomEvent();
