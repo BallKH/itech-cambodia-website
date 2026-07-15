@@ -1,0 +1,109 @@
+/* iTech Cambodia — AI Robot Mascot
+   Sizing/position mirrors robot/config.js CONFIG.size / CONFIG.position —
+   keep both in sync if you change one. */
+
+.itech-robot {
+  position: fixed;
+  right: 24px;
+  bottom: 90px; /* clears the site's .back-top button */
+  width: 150px;
+  height: 150px;
+  z-index: 950;
+  cursor: grab;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+.itech-robot:active { cursor: grabbing; }
+.itech-robot:focus-visible {
+  outline: 2px solid #3ec6ff;
+  outline-offset: 6px;
+  border-radius: 50%;
+}
+
+.itech-robot-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 720px) {
+  .itech-robot {
+    width: 100px;
+    height: 100px;
+    right: 14px;
+    bottom: 78px;
+  }
+}
+
+/* ---------- speech bubble ---------- */
+.itech-robot-bubble {
+  position: absolute;
+  right: 8px;
+  bottom: 108%;
+  max-width: 190px;
+  width: max-content;
+  background: #ffffff;
+  color: #0e1f3d;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  padding: 10px 13px;
+  border-radius: 14px;
+  box-shadow: 0 10px 26px -8px rgba(14, 31, 61, 0.35), 0 2px 6px rgba(14, 31, 61, 0.12);
+  opacity: 0;
+  transform: translateY(6px) scale(0.94);
+  transform-origin: bottom right;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  pointer-events: none;
+}
+.itech-robot-bubble::after {
+  content: "";
+  position: absolute;
+  right: 22px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  transform: rotate(-45deg);
+}
+.itech-robot-bubble.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* ---------- mute toggle ---------- */
+.itech-robot-mute {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(14, 31, 61, 0.1);
+  background: #ffffff;
+  color: #0e1f3d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 10px -3px rgba(14, 31, 61, 0.3);
+  opacity: 0.55;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.itech-robot-mute:hover { opacity: 1; transform: scale(1.08); }
+.itech-robot-mute svg { width: 14px; height: 14px; }
+
+/* ---------- confetti overlay ---------- */
+.itech-robot-confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .itech-robot-bubble { transition: opacity 0.12s linear; transform: none !important; }
+}
