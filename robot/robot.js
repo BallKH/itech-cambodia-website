@@ -1,23 +1,24 @@
 // iTech Cambodia — AI Robot Mascot — entry point & orchestrator
-// Renders the official mascot (assets/robot.png) as a fixed, floating,
-// interactive DOM element and wires robot-animation.js / robot-audio.js /
+// Renders a real Three.js scene (see robot-rig.js) as a fixed, floating,
+// interactive mascot and wires robot-animation.js / robot-audio.js /
 // robot-speech.js / robot-state.js together. Exposes a small public API +
 // plugin system so a future LLM integration can hook in without touching
 // this file.
 //
-// SWITCHING TO A REAL 3D MODEL LATER: set CONFIG.model.type = "glb" in
-// config.js. createRenderer() below is the one place that reads that value;
-// a future GLB renderer just needs to build the same `parts` shape that
-// buildPngRenderer() returns (floater/tilter wrappers, eyelidL/R, eyeGlowL/R,
-// mouthGlow, hologram, zones) so robot-animation.js and the interaction
-// wiring in this file keep working completely unchanged.
+// SWITCHING TO A REAL .glb MODEL LATER: set CONFIG.model.type = "glb" in
+// config.js and point CONFIG.model.glbUrl at the exported file. createRig()
+// below is the one place that reads that value — it tries loadGlbRig()
+// first and falls back to the procedural rig (with a console warning) if
+// the file is missing or doesn't contain every bone robot-animation.js
+// expects, so a bad export can never take the mascot down.
 
 import { CONFIG } from "./config.js";
 import { state } from "./robot-state.js";
-import { on } from "./robot-events.js";
 import { audio } from "./robot-audio.js";
 import { createAnimator } from "./robot-animation.js";
 import { createSpeech } from "./robot-speech.js";
+import { buildProceduralRig, loadGlbRig } from "./robot-rig.js";
+import * as THREE from "./vendor/three.module.min.js";
 
 function injectStylesheet() {
   const href = new URL("./css/robot.css", import.meta.url).href;
@@ -28,94 +29,19 @@ function injectStylesheet() {
   document.head.appendChild(link);
 }
 
-function zoneStyle(z) {
-  return `top:${z.top}%;left:${z.left}%;width:${z.width}%;height:${z.height}%;`;
-}
-
-/**
- * Builds the PNG-based renderer: a plain DOM/CSS mascot. Returns the same
- * `parts` shape any future renderer (e.g. a GLB one) must also return.
- */
-function buildPngRenderer(container) {
-  const floater = document.createElement("div");
-  floater.className = "itech-robot-floater";
-  container.appendChild(floater);
-
-  const tilter = document.createElement("div");
-  tilter.className = "itech-robot-tilter";
-  floater.appendChild(tilter);
-
-  const img = document.createElement("img");
-  img.className = "itech-robot-img";
-  img.src = `${CONFIG.model.pngUrl}?v=${CONFIG.model.pngVersion}`;
-  img.alt = "iTech Cambodia AI mascot";
-  img.draggable = false;
-  tilter.appendChild(img);
-
-  const eyelidL = document.createElement("div");
-  eyelidL.className = "itech-robot-eyelid";
-  Object.assign(eyelidL.style, eyeStyle(CONFIG.eyeOverlay.left));
-  tilter.appendChild(eyelidL);
-
-  const eyelidR = document.createElement("div");
-  eyelidR.className = "itech-robot-eyelid";
-  Object.assign(eyelidR.style, eyeStyle(CONFIG.eyeOverlay.right));
-  tilter.appendChild(eyelidR);
-
-  const eyeGlowL = document.createElement("div");
-  eyeGlowL.className = "itech-robot-eyeglow";
-  Object.assign(eyeGlowL.style, eyeGlowStyle(CONFIG.eyeOverlay.left));
-  tilter.appendChild(eyeGlowL);
-
-  const eyeGlowR = document.createElement("div");
-  eyeGlowR.className = "itech-robot-eyeglow";
-  Object.assign(eyeGlowR.style, eyeGlowStyle(CONFIG.eyeOverlay.right));
-  tilter.appendChild(eyeGlowR);
-
-  const mouthGlow = document.createElement("div");
-  mouthGlow.className = "itech-robot-mouthglow";
-  const m = CONFIG.mouthOverlay;
-  Object.assign(mouthGlow.style, { top: `${m.top}%`, left: `${m.left}%`, width: `${m.width}%`, height: `${m.height}%` });
-  tilter.appendChild(mouthGlow);
-
-  const zones = {};
-  for (const [part, z] of Object.entries(CONFIG.hitZones)) {
-    const el = document.createElement("div");
-    el.className = "itech-robot-zone";
-    el.dataset.part = part;
-    el.style.cssText = zoneStyle(z);
-    tilter.appendChild(el);
-    zones[part] = el;
-  }
-
-  const hologram = document.createElement("div");
-  hologram.className = "itech-robot-hologram";
-  const t = CONFIG.hitZones.tablet;
-  hologram.style.left = `${t.left + t.width / 2}%`;
-  hologram.style.top = `${t.top}%`;
-  tilter.appendChild(hologram);
-
-  return { floater, tilter, eyelidL, eyelidR, eyeGlowL, eyeGlowR, mouthGlow, hologram, zones };
-}
-
-function eyeStyle(e) {
-  const s = e.size;
-  return { top: `${e.top}%`, left: `${e.left}%`, width: `${s}%`, height: `${s}%` };
-}
-function eyeGlowStyle(e) {
-  const s = e.size * 0.4;
-  return { top: `${e.top + e.size * 0.3}%`, left: `${e.left + e.size * 0.3}%`, width: `${s}%`, height: `${s}%` };
-}
-
 /** The one place CONFIG.model.type is read — see file header. */
-function createRenderer(container) {
+async function createRig() {
   if (CONFIG.model.type === "glb") {
-    console.warn(
-      "[iTech Robot] model.type is \"glb\" but no GLB renderer is implemented yet — falling back to the PNG mascot. " +
-        "A future renderer module just needs to return the same `parts` shape as buildPngRenderer()."
-    );
+    try {
+      return await loadGlbRig(THREE, `${CONFIG.model.glbUrl}?v=${CONFIG.model.glbVersion || 1}`);
+    } catch (err) {
+      console.warn(
+        `[iTech Robot] Couldn't use robot.glb (${err.message}) — falling back to the procedural rig. ` +
+          "A valid export just needs every bone named in config.js#BONE_NAMES present in the scene graph."
+      );
+    }
   }
-  return buildPngRenderer(container);
+  return buildProceduralRig(THREE);
 }
 
 function buildDOM() {
@@ -127,7 +53,16 @@ function buildDOM() {
   container.setAttribute("role", "img");
   container.setAttribute("aria-label", CONFIG.a11y.label);
   document.body.appendChild(container);
-  return container;
+
+  const canvasHost = document.createElement("div");
+  canvasHost.className = "itech-robot-canvas-host";
+  container.appendChild(canvasHost);
+
+  const hologram = document.createElement("div");
+  hologram.className = "itech-robot-hologram";
+  container.appendChild(hologram);
+
+  return { container, canvasHost, hologram };
 }
 
 function readGreeted() {
@@ -145,13 +80,88 @@ function writeGreeted() {
   }
 }
 
-function boot() {
-  const container = buildDOM();
-  const { floater, tilter, eyelidL, eyelidR, eyeGlowL, eyeGlowR, mouthGlow, hologram, zones } = createRenderer(container);
-  const animator = createAnimator({ floater, tilter, eyelidL, eyelidR, eyeGlowL, eyeGlowR, mouthGlow, hologram });
+async function boot() {
+  const { container, canvasHost, hologram } = buildDOM();
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(CONFIG.camera.fovDeg, 1, 0.05, 20);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setClearColor(0x000000, 0);
+  canvasHost.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x2c3450, 1.15));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
+  keyLight.position.set(1.1, 1.6, 2.2);
+  scene.add(keyLight);
+  const fillLight = new THREE.DirectionalLight(0xdbe9ff, 0.35);
+  fillLight.position.set(-1.4, 0.5, 1.2);
+  scene.add(fillLight);
+
+  const rig = await createRig();
+
+  // Two nested wrappers — see robot-animation.js header for why ambient
+  // (floater) and reactive (tilter) motion must live on different objects.
+  const floater = new THREE.Group();
+  const tilter = new THREE.Group();
+  floater.add(tilter);
+  tilter.add(rig.group);
+  scene.add(floater);
+
+  // Frame the camera around the rig's own measured size (never hand-tuned
+  // per pose). The rest-pose bounding box is much narrower than a raised or
+  // outstretched arm gets during a gesture, so the margin here is generous
+  // on purpose — retune only if a live check shows a gesture still clipping.
+  const span = Math.max(rig.boundingSize.x, rig.boundingSize.y) * 2.6;
+  const dist = span / 2 / Math.tan((CONFIG.camera.fovDeg * Math.PI) / 360);
+  camera.position.set(0, 0, dist);
+  camera.lookAt(0, 0, 0);
+
+  // Sized directly from CONFIG.size breakpoints rather than the canvas
+  // host's measured layout box — the stylesheet is injected via a <link>
+  // that loads asynchronously, so clientWidth/clientHeight can't be trusted
+  // to be correct (or non-zero) the instant boot() runs.
+  function currentSizePx() {
+    const w = window.innerWidth;
+    if (w <= CONFIG.size.mobileBreakpoint) return CONFIG.size.mobile;
+    if (w <= CONFIG.size.tabletBreakpoint) return CONFIG.size.tablet;
+    return CONFIG.size.desktop;
+  }
+  function resize() {
+    const px = currentSizePx();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, CONFIG.size.maxPixelRatio));
+    renderer.setSize(px, px, false);
+    camera.aspect = 1;
+    camera.updateProjectionMatrix();
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  let hologramTimer = null;
+  function showHologram(topic, ms = CONFIG.timing.hologramAutoHideMs) {
+    hologram.textContent = topic;
+    hologram.classList.add("show");
+    clearTimeout(hologramTimer);
+    if (ms > 0) hologramTimer = setTimeout(hideHologram, ms);
+  }
+  function hideHologram() {
+    clearTimeout(hologramTimer);
+    hologram.classList.remove("show");
+  }
+
+  const animator = createAnimator(rig, { floater, tilter });
+  animator.setHologramHandlers(showHologram, hideHologram);
   const speaker = createSpeech(container);
 
+  let running = true;
+  let rafId = null;
+  function renderLoop() {
+    if (running) renderer.render(scene, camera);
+    rafId = requestAnimationFrame(renderLoop);
+  }
+  renderLoop();
+
   document.addEventListener("visibilitychange", () => {
+    running = !document.hidden || !CONFIG.performance.pauseWhenHidden;
     if (document.hidden) window.gsap?.globalTimeline.pause();
     else window.gsap?.globalTimeline.resume();
   });
@@ -166,19 +176,23 @@ function boot() {
         return animator.nod();
       case "eyes":
         return animator.faceReaction();
-      case "body":
+      case "mouth":
+        return animator.smilePulse(1.2);
+      case "torso":
         return animator.bounceLaugh();
+      case "hip":
+        return animator.tiltHead();
       case "armL":
         return animator.wave();
       case "armR":
         return animator.thumbsUp();
       case "legL":
+        return animator.legReaction("L");
       case "legR":
-        return animator.legReaction();
+        return animator.legReaction("R");
       case "tablet": {
         const topic = CONFIG.hologramTopics[Math.floor(Math.random() * CONFIG.hologramTopics.length)];
-        animator.showHologram(topic);
-        audio.thinking();
+        animator.useTablet(topic);
         speaker.say(`Showing ${topic} overview`, 2200);
         return;
       }
@@ -187,9 +201,25 @@ function boot() {
     }
   }
 
+  // ---------- raycasting: which bone/part is under the pointer ----------
+  const raycaster = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  function partAtEvent(e) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(ndc, camera);
+    const hits = raycaster.intersectObject(scene, true);
+    for (const hit of hits) {
+      if (hit.object?.userData?.part) return hit.object.userData.part;
+    }
+    return null;
+  }
+
   let lastClickAt = 0;
-  container.addEventListener("click", (e) => {
-    const zoneEl = e.target.closest?.(".itech-robot-zone");
+  renderer.domElement.addEventListener("pointerdown", (e) => {
+    const part = partAtEvent(e);
     const now = performance.now();
     const isDoubleClick = now - lastClickAt < CONFIG.timing.doubleClickWindowMs;
     lastClickAt = now;
@@ -199,9 +229,9 @@ function boot() {
       speaker.say("Yay! 🎉", 2200);
       return;
     }
-    if (!zoneEl) return;
+    if (!part) return;
     const count = state.registerClick();
-    reactToPart(zoneEl.dataset.part);
+    reactToPart(part);
     if (count === CONFIG.easterEggs.clickCount) {
       setTimeout(() => {
         animator.dance();
@@ -223,7 +253,8 @@ function boot() {
     }
   });
 
-  // ---------- cursor follow (max CONFIG.camera.maxTiltDeg) ----------
+  // ---------- cursor follow: head + eyes turn toward the mouse, capped at
+  // CONFIG.camera.maxLookDeg (never the whole robot spinning) ----------
   let cursorRaf = null;
   window.addEventListener(
     "pointermove",
@@ -336,8 +367,17 @@ function boot() {
     isMuted: () => state.muted,
     wave: () => animator.wave(),
     nod: () => animator.nod(),
+    clap: () => animator.clap(),
+    thumbsUp: () => animator.thumbsUp(),
+    raiseHand: (side) => animator.raiseHand(side),
+    tiltHead: () => animator.tiltHead(),
+    dance: () => animator.dance(),
+    jump: () => animator.jump(),
+    walk: () => animator.walk(),
+    sitDown: () => animator.sitDown(),
+    useTablet: (topic) => animator.useTablet(topic || CONFIG.hologramTopics[0]),
     celebrate: () => (animator.celebrate(() => spawnConfetti(container)), audio.happy()),
-    showHologram: (topic, ms) => animator.showHologram(topic, ms),
+    showHologram: (topic, ms) => showHologram(topic, ms),
     navigateTo: (url) => {
       window.location.href = url;
     },
@@ -349,6 +389,10 @@ function boot() {
     getPlugin: (name) => plugins.get(name),
     destroy() {
       animator.stop();
+      running = false;
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", resize);
+      renderer.dispose();
       container.remove();
       delete window.iTechRobot;
     },
@@ -404,7 +448,10 @@ function spawnConfetti(container) {
 }
 
 function scheduleBoot() {
-  const start = () => setTimeout(boot, CONFIG.performance.idleInitDelayMs);
+  const start = () =>
+    setTimeout(() => {
+      boot().catch((err) => console.error("[iTech Robot] failed to start:", err));
+    }, CONFIG.performance.idleInitDelayMs);
   if (document.readyState === "complete") start();
   else window.addEventListener("load", start, { once: true });
 }

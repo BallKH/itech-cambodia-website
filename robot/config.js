@@ -1,25 +1,89 @@
 // iTech Cambodia — AI Robot Mascot — central configuration
-// Single source of truth for the mascot's asset paths, sizing, positions,
-// hit-zones, timing and feature flags.
+// Single source of truth for the mascot's rig, palette, sizing, timing and
+// feature flags.
 //
-// SWITCHING TO A REAL 3D MODEL LATER: change `model.type` from "png" to
+// SWITCHING TO A REAL .glb MODEL LATER: change `model.type` from "rig" to
 // "glb" and point `model.glbUrl` at the exported file. robot.js reads only
-// this one value to decide which renderer to build — nothing else in the
-// codebase needs to change. (The "glb" renderer is a documented extension
-// point, not yet implemented — see the comment on createRenderer() in
-// robot.js for what a future renderer module must provide.)
+// this one value to decide which renderer to build. A real .glb is loaded
+// through robot/vendor/GLTFLoader.js and its bones are matched *by name*
+// against BONE_NAMES below — export your rig from Blender/Mixamo/etc. with
+// bones named exactly as listed there (a Blender "Rigify"-style human rig
+// renamed to these names works fine) and every gesture in
+// robot-animation.js keeps working completely unchanged, because it only
+// ever touches `rig.bones.<name>`, never raw geometry.
+
+// The canonical bone/part names every renderer (procedural rig today, a
+// loaded .glb tomorrow) must expose on `rig.bones`. robot-animation.js and
+// the per-part click map in robot.js are written entirely in terms of this
+// list — nothing else in the codebase names a bone directly.
+export const BONE_NAMES = [
+  "hip",
+  "torso",
+  "neck",
+  "head",
+  "eyeL",
+  "eyeR",
+  "eyelidL",
+  "eyelidR",
+  "mouth",
+  "armL_upper",
+  "armL_fore",
+  "armL_hand",
+  "fingersL",
+  "armR_upper",
+  "armR_fore",
+  "armR_hand",
+  "fingersR",
+  "tablet",
+  "legL_upper",
+  "legL_lower",
+  "footL",
+  "legR_upper",
+  "legR_lower",
+  "footR",
+];
+
+// Bone -> clickable "part" a visitor can interact with. Several bones share
+// one part (e.g. the whole left leg reacts as one zone) — see
+// robot.js#reactToPart. Every raycast hit walks up parents until it finds an
+// object whose userData.part is a key here.
+export const PART_TO_BONES = {
+  head: ["head", "neck"],
+  eyes: ["eyeL", "eyeR", "eyelidL", "eyelidR"],
+  mouth: ["mouth"],
+  torso: ["torso"],
+  hip: ["hip"],
+  armL: ["armL_upper", "armL_fore", "armL_hand", "fingersL"],
+  armR: ["armR_upper", "armR_fore", "armR_hand", "fingersR"],
+  legL: ["legL_upper", "legL_lower", "footL"],
+  legR: ["legR_upper", "legR_lower", "footR"],
+  tablet: ["tablet"],
+};
 
 export const CONFIG = {
   model: {
-    type: "png", // "png" (today) | "glb" (future — see robot.js)
-    // /assets/ is served with a 1-year immutable Cache-Control header (see
-    // vercel.json). If robot.png is ever replaced in place (same filename —
-    // e.g. swapping in a cleaner transparent export), bump pngVersion so
-    // browsers actually fetch the new file instead of serving the old one
-    // for up to a year.
-    pngUrl: "assets/robot.png",
-    pngVersion: 1,
+    type: "rig", // "rig" (procedural Three.js geometry, today) | "glb" (future)
     glbUrl: "assets/robot.glb",
+    // Reference-only: the flat mascot artwork the procedural rig's colors
+    // and proportions were sampled from. Not rendered once the rig is live.
+    referencePng: "assets/robot.png",
+  },
+
+  // Palette sampled directly from assets/robot.png's alpha-covered pixels
+  // (white/light-grey shell, near-black visor, navy trim/tablet) so the 3D
+  // rig reads as the same character, not a redesign. Retune here only if a
+  // future art revision changes the source palette.
+  palette: {
+    shellLight: 0xf3f4f6,
+    shellMid: 0xd7dae0,
+    shellShadow: 0xaeb4bd,
+    visorDark: 0x070f1c,
+    trimNavy: 0x1c3350,
+    trimNavyDark: 0x16283f,
+    jointNavy: 0x24344a,
+    eyeGlow: 0x8fe3ff,
+    tabletScreen: 0x1c3350,
+    tabletGlow: 0x8fe3ff,
   },
 
   // Mirrored in robot/css/robot.css media queries — keep both in sync.
@@ -29,6 +93,7 @@ export const CONFIG = {
     mobile: 90, // px, <= mobileBreakpoint
     tabletBreakpoint: 1024,
     mobileBreakpoint: 600,
+    maxPixelRatio: 2,
   },
 
   position: {
@@ -36,34 +101,11 @@ export const CONFIG = {
     bottom: 25,
   },
 
-  // Percentage-based hit-zones over the flat PNG (top/left/width/height, all
-  // % of the image box). Tuned for the official mascot's proportions — retune
-  // here if a future image revision shifts the pose; nothing else references
-  // raw coordinates.
-  hitZones: {
-    head: { top: 2, left: 30, width: 40, height: 34 },
-    eyes: { top: 14, left: 38, width: 24, height: 10 },
-    body: { top: 36, left: 40, width: 20, height: 24 },
-    armL: { top: 38, left: 22, width: 20, height: 26 },
-    armR: { top: 38, left: 58, width: 20, height: 26 },
-    tablet: { top: 42, left: 52, width: 22, height: 26 },
-    legL: { top: 68, left: 36, width: 12, height: 24 },
-    legR: { top: 68, left: 48, width: 12, height: 24 },
-  },
-
-  // Eye overlay positions (% of image box) — drives blink eyelids and the
-  // small cursor-tracking glow dots layered on top of the source art.
-  eyeOverlay: {
-    left: { top: 16, left: 38, size: 8 },
-    right: { top: 16, left: 54, size: 8 },
-  },
-  mouthOverlay: { top: 25, left: 42, width: 16, height: 4 },
-
   camera: {
-    // Max rotation applied to the whole mascot toward the cursor — simulates
-    // head/body turn on a flat image. Never the "spin the whole robot" kind
-    // of rotation; kept small and eased.
-    maxTiltDeg: 10,
+    fovDeg: 32,
+    // Whole-head/eye turn toward the cursor is capped here — never the
+    // whole robot spinning to face the mouse, just a subtle "aware" turn.
+    maxLookDeg: 15,
   },
 
   performance: {
@@ -100,7 +142,22 @@ export const CONFIG = {
     contact: "Let's build something together — I'd love to help.",
   },
 
-  randomEvents: ["wave", "smile", "checkTablet", "lookAround", "stretch", "dance", "repairServer", "showShield", "launchHologram"],
+  // Full idle-behavior library — never the same one twice in a row.
+  randomEvents: [
+    "wave",
+    "raiseHand",
+    "smile",
+    "tiltHead",
+    "checkTablet",
+    "lookAround",
+    "stretch",
+    "dance",
+    "walk",
+    "sitDown",
+    "repairServer",
+    "showShield",
+    "launchHologram",
+  ],
 
   hologramTopics: ["Cloud", "Cybersecurity", "VMware", "Networking", "AI", "SAP"],
 

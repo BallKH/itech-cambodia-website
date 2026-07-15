@@ -1,5 +1,5 @@
-/* iTech Cambodia — AI Robot Mascot (PNG-based)
-   Sizing/position/hit-zones mirror robot/config.js — keep both in sync. */
+/* iTech Cambodia — AI Robot Mascot (Three.js rig)
+   Sizing/position mirror robot/config.js — keep both in sync. */
 
 .itech-robot {
   position: fixed;
@@ -23,60 +23,27 @@
   .itech-robot { width: 90px; right: 14px; bottom: 18px; }
 }
 
-.itech-robot-floater,
-.itech-robot-tilter {
+/* ---------- 3D canvas host ---------- */
+.itech-robot-canvas-host {
   position: relative;
   width: 100%;
+  aspect-ratio: 1 / 1;
+  filter: drop-shadow(0 10px 14px rgba(14, 31, 61, 0.28));
 }
-.itech-robot-tilter {
-  will-change: transform;
-  filter: brightness(1) drop-shadow(0 10px 14px rgba(14, 31, 61, 0.28));
-}
-
-.itech-robot-img {
+.itech-robot-canvas-host canvas {
   display: block;
   width: 100%;
-  height: auto;
-  pointer-events: none;
-  user-select: none;
-}
-
-/* ---------- simulated eyelids / eye-glow / mouth-glow ---------- */
-.itech-robot-eyelid {
-  position: absolute;
-  background: #0b1220;
-  border-radius: 50%;
-  transform: scaleY(0);
-  pointer-events: none;
-}
-.itech-robot-eyeglow {
-  position: absolute;
-  background: radial-gradient(circle, #ffffff 0%, #8fe3ff 55%, transparent 75%);
-  border-radius: 50%;
-  box-shadow: 0 0 6px 1px rgba(143, 227, 255, 0.85);
-  pointer-events: none;
-}
-.itech-robot-mouthglow {
-  position: absolute;
-  background: radial-gradient(ellipse, rgba(143, 227, 255, 0.9), rgba(62, 198, 255, 0.15) 70%, transparent);
-  border-radius: 999px;
-  opacity: 0.55;
-  filter: blur(1.5px);
-  pointer-events: none;
-}
-
-/* ---------- invisible per-body-part click zones ---------- */
-.itech-robot-zone {
-  position: absolute;
-  background: transparent;
+  height: 100%;
   cursor: pointer;
+  touch-action: none;
 }
 
 /* ---------- hologram popup (tablet reaction) ---------- */
 .itech-robot-hologram {
   position: absolute;
+  left: 50%;
+  top: -6px;
   transform: translate(-50%, -100%) scale(0.85);
-  margin-top: -6px;
   padding: 6px 12px;
   background: rgba(14, 31, 61, 0.92);
   color: #8fe3ff;
