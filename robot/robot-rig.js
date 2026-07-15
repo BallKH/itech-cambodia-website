@@ -58,6 +58,8 @@ export function buildProceduralRig(THREE) {
   const trim = mat(P.trimNavy, { metalness: 0.3, roughness: 0.35 });
   const joint = mat(P.jointNavy, { metalness: 0.4, roughness: 0.3 });
   const eyeGlowMat = mat(P.eyeGlow, { metalness: 0, roughness: 0.5, emissive: P.eyeGlow, emissiveIntensity: 1.4 });
+  const highlightMat = mat(0xffffff, { metalness: 0, roughness: 0.3, emissive: 0xffffff, emissiveIntensity: 0.9 });
+  const accentMat = mat(P.accentOrange, { metalness: 0, roughness: 0.4, emissive: P.accentOrange, emissiveIntensity: 0.55 });
   const tabletBody = mat(P.trimNavyDark, { metalness: 0.3, roughness: 0.4 });
   const tabletScreenMat = mat(P.tabletScreen, {
     metalness: 0,
@@ -134,6 +136,9 @@ export function buildProceduralRig(THREE) {
     const chest = new THREE.Mesh(new THREE.CircleGeometry(S.torsoW * 0.22, 20), trim);
     chest.position.set(0, S.torsoH * 0.55, S.torsoD * 0.5 + 0.001);
     torso.add(chest);
+    const chestDot = new THREE.Mesh(new THREE.CircleGeometry(S.torsoW * 0.035, 12), accentMat);
+    chestDot.position.set(-S.torsoW * 0.17, S.torsoH * 0.63, S.torsoD * 0.5 + 0.002);
+    torso.add(chestDot);
   }
 
   const neck = pivot("neck", torso, 0, S.torsoH, 0);
@@ -143,29 +148,60 @@ export function buildProceduralRig(THREE) {
     neck.add(m);
   }
 
+  const headY = S.headR * 0.95;
   const head = pivot("head", neck, 0, S.neckH * 2, 0);
   {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(S.headR, 24, 18), shell);
-    m.position.set(0, S.headR * 0.95, 0);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(S.headR, 28, 20), shell);
+    m.position.set(0, headY, 0);
     head.add(m);
-    // visor band across the face for a friendly "AI face" read
-    const visorBand = new THREE.Mesh(
-      new THREE.SphereGeometry(S.headR * 1.001, 24, 18, 0, Math.PI * 2, Math.PI * 0.32, Math.PI * 0.3),
+
+    // face visor — a flattened rounded plaque (a sideways capsule has
+    // naturally rounded left/right edges, unlike a plain box) set into the
+    // front of the head, matching the reference art's dark screen-face.
+    const visorW = S.headR * 1.28;
+    const visorH = S.headR * 0.88;
+    const visorPlaque = new THREE.Mesh(
+      new THREE.CapsuleGeometry(visorH / 2, Math.max(0.001, visorW - visorH), 4, 14),
       visor
     );
-    visorBand.position.copy(m.position);
-    head.add(visorBand);
+    visorPlaque.rotation.z = Math.PI / 2;
+    visorPlaque.scale.z = 0.22;
+    visorPlaque.position.set(0, headY, S.headR * 0.88);
+    head.add(visorPlaque);
+
+    // brow ridge — small raised bump on top of the head, like the reference
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(S.headR * 0.55, S.headR * 0.14, S.headR * 0.5), shell);
+    brow.position.set(0, headY + S.headR * 0.92, S.headR * 0.25);
+    brow.rotation.x = -0.12;
+    head.add(brow);
+
+    // ears — ring pods on each side of the head
+    for (const side of [-1, 1]) {
+      const earX = side * S.headR * 1.02;
+      const earY = headY - S.headR * 0.05;
+      const earCup = new THREE.Mesh(new THREE.CylinderGeometry(S.headR * 0.26, S.headR * 0.26, S.headR * 0.1, 20), visor);
+      earCup.rotation.z = Math.PI / 2;
+      earCup.position.set(earX, earY, 0);
+      head.add(earCup);
+      const earRing = new THREE.Mesh(new THREE.TorusGeometry(S.headR * 0.17, S.headR * 0.032, 8, 20), eyeGlowMat);
+      earRing.rotation.y = Math.PI / 2;
+      earRing.position.set(earX + side * S.headR * 0.052, earY, 0);
+      head.add(earRing);
+    }
   }
-  const eyeY = S.headR * 0.98;
-  const eyeZ = S.headR * 0.92;
-  const eyeX = S.headR * 0.4;
-  const eyeSize = S.headR * 0.16;
+  const eyeY = headY + S.headR * 0.06;
+  const eyeZ = S.headR * 0.97;
+  const eyeX = S.headR * 0.36;
+  const eyeSize = S.headR * 0.21;
 
   function buildEye(name, x) {
     const eye = pivot(name, head, x, eyeY, eyeZ);
-    const glow = new THREE.Mesh(new THREE.CircleGeometry(eyeSize, 16), eyeGlowMat);
-    glow.position.set(0, 0, 0.002);
+    const glow = new THREE.Mesh(new THREE.CircleGeometry(eyeSize, 20), eyeGlowMat);
+    glow.scale.set(0.85, 1, 1);
     eye.add(glow);
+    const highlight = new THREE.Mesh(new THREE.CircleGeometry(eyeSize * 0.26, 12), highlightMat);
+    highlight.position.set(-eyeSize * 0.3, eyeSize * 0.3, 0.003);
+    eye.add(highlight);
     return eye;
   }
   buildEye("eyeL", -eyeX);
@@ -189,12 +225,18 @@ export function buildProceduralRig(THREE) {
   }
 
   // ---------- arms (shared builder, mirrored by sign of x) ----------
+  // Joint collars (flattened cylinders around each limb, ring-like) mark
+  // shoulder/elbow/wrist the way the reference art shows dark segment
+  // rings, and hands/feet are built oversized on purpose — a cute mascot
+  // reads "friendly" with big paws/boots, not anatomically slender ones.
+  function jointCollar(radius) {
+    return new THREE.Mesh(new THREE.CylinderGeometry(radius * 1.22, radius * 1.22, radius * 0.55, 16), joint);
+  }
   function buildArm(side, signX) {
     const shoulderX = signX * (S.torsoW * 0.52);
     const upper = pivot(`arm${side}_upper`, torso, shoulderX, S.torsoH * 0.86, 0);
     {
-      const shoulderCap = new THREE.Mesh(new THREE.SphereGeometry(S.upperArmR * 1.05, 14, 12), trim);
-      upper.add(shoulderCap);
+      upper.add(jointCollar(S.upperArmR));
       const m = capsule(S.upperArmR, S.upperArmLen, shell);
       m.position.set(0, -S.upperArmLen / 2, 0);
       upper.add(m);
@@ -209,15 +251,18 @@ export function buildProceduralRig(THREE) {
     }
     const hand = pivot(`arm${side}_hand`, fore, 0, -S.foreArmLen, 0);
     {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(S.handR, 14, 12), shell);
-      m.position.set(0, -S.handR * 0.6, 0);
-      hand.add(m);
+      hand.add(jointCollar(S.foreArmR * 0.9));
+      // oversized rounded paw/mitten
+      const palm = new THREE.Mesh(new THREE.SphereGeometry(S.handR, 16, 14), shell);
+      palm.scale.set(1, 0.95, 0.85);
+      palm.position.set(0, -S.handR * 0.7, S.handR * 0.08);
+      hand.add(palm);
     }
-    const fingers = pivot(`fingers${side}`, hand, 0, -S.handR * 1.15, S.handR * 0.25);
+    const fingers = pivot(`fingers${side}`, hand, 0, -S.handR * 1.3, S.handR * 0.32);
     {
       for (let i = -1; i <= 1; i++) {
         const f = new THREE.Mesh(new THREE.CapsuleGeometry(S.fingerR, S.fingerLen, 3, 6), shell);
-        f.position.set(i * S.fingerR * 2.6, -S.fingerLen / 2, 0);
+        f.position.set(i * S.fingerR * 2.8, -S.fingerLen / 2, 0);
         fingers.add(f);
       }
     }
@@ -244,6 +289,7 @@ export function buildProceduralRig(THREE) {
     const hipX = signX * (S.hipW * 0.28);
     const upper = pivot(`leg${side}_upper`, hip, hipX, -S.hipH * 0.1, 0);
     {
+      upper.add(jointCollar(S.upperLegR));
       const m = capsule(S.upperLegR, S.upperLegLen, shell);
       m.position.set(0, -S.upperLegLen / 2, 0);
       upper.add(m);
@@ -258,9 +304,21 @@ export function buildProceduralRig(THREE) {
     }
     const foot = pivot(`foot${side}`, lower, 0, -S.lowerLegLen, 0);
     {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(S.footW, S.footH, S.footD), trim);
-      m.position.set(0, -S.footH / 2, S.footD * 0.18);
-      foot.add(m);
+      foot.add(jointCollar(S.lowerLegR * 0.95));
+      // oversized rounded boot: tapered cylinder (ankle -> wide base) + flat
+      // sole + a glowing strip along the front, echoing the reference art.
+      const boot = new THREE.Mesh(
+        new THREE.CylinderGeometry(S.lowerLegR * 0.9, S.footW * 0.56, S.footH * 1.7, 14),
+        shell
+      );
+      boot.position.set(0, -S.footH * 0.85, S.footD * 0.06);
+      foot.add(boot);
+      const sole = new THREE.Mesh(new THREE.BoxGeometry(S.footW, S.footH * 0.55, S.footD), trim);
+      sole.position.set(0, -S.footH * 1.7, S.footD * 0.18);
+      foot.add(sole);
+      const glow = new THREE.Mesh(new THREE.BoxGeometry(S.footW * 0.62, S.footH * 0.16, S.footD * 0.5), eyeGlowMat);
+      glow.position.set(0, -S.footH * 1.95, S.footD * 0.16);
+      foot.add(glow);
     }
     return { upper, lower, foot };
   }

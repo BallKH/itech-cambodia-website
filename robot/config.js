@@ -84,6 +84,7 @@ export const CONFIG = {
     eyeGlow: 0x8fe3ff,
     tabletScreen: 0x1c3350,
     tabletGlow: 0x8fe3ff,
+    accentOrange: 0xf36a1f,
   },
 
   // Mirrored in robot/css/robot.css media queries — keep both in sync.
