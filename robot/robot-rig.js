@@ -406,8 +406,24 @@ export async function loadStaticGlbRig(THREE, url) {
   const gltf = await loader.loadAsync(url);
   const loaded = gltf.scene || gltf.scenes[0];
 
+  // These Blender/AI exports bake the model's real colors into an
+  // emissive texture with baseColorFactor zeroed out — a "shadeless" trick
+  // so the paint job looks right in any viewer regardless of its lights.
+  // Left as MeshStandardMaterial, our own scene lights (hemisphere + key +
+  // fill + rim, added so the *procedural* rig reads with depth) still mix
+  // their own specular/ambient response into an all-black-diffuse surface
+  // and wash the paint out to a flat white silhouette. Swapping to
+  // MeshBasicMaterial makes the mesh fully unlit — it always shows exactly
+  // the texture pixels, immune to whatever lighting the scene has.
   loaded.traverse((obj) => {
-    if (obj.isMesh) obj.userData.part = "torso"; // any click -> a generic whole-body reaction
+    if (!obj.isMesh) return;
+    obj.userData.part = "torso"; // any click -> a generic whole-body reaction
+    const src = obj.material;
+    const paint = src?.emissiveMap || src?.map;
+    if (paint) {
+      obj.material = new THREE.MeshBasicMaterial({ map: paint, side: src.side });
+      src.dispose();
+    }
   });
 
   // The export's own origin is whatever Blender's object origin happened
