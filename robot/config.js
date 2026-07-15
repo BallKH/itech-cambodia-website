@@ -66,7 +66,7 @@ export const CONFIG = {
     glbUrl: "assets/robot.glb",
     // Reference-only: the flat mascot artwork the procedural rig's colors
     // and proportions were sampled from. Not rendered once the rig is live.
-    referencePng: "assets/robot.png",
+    referencePng: "assets/Robot-V1.png",
   },
 
   // Palette sampled directly from assets/robot.png's alpha-covered pixels

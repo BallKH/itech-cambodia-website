@@ -2,8 +2,8 @@
 
 .itech-assistant-toggle {
   position: absolute;
-  bottom: -6px;
-  left: -6px;
+  top: 26px;
+  right: -6px;
   width: 30px;
   height: 30px;
   border-radius: 50%;
