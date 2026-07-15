@@ -1,378 +1,23 @@
 // iTech Cambodia — AI Robot Mascot — entry point & orchestrator
-// Builds the DOM widget, the Three.js scene, and (by default) a procedural
-// robot mesh. Wires animation.js / interaction.js / speech.js together and
-// exposes a small public API + plugin system so a future LLM integration
-// (chat, navigation, quoting) can hook in without touching this file.
+// Renders the official mascot (assets/robot.png) as a fixed, floating,
+// interactive DOM element and wires robot-animation.js / robot-audio.js /
+// robot-speech.js / robot-state.js together. Exposes a small public API +
+// plugin system so a future LLM integration can hook in without touching
+// this file.
 //
-// To swap in a real, artist-made model later: export a .glb whose node
-// names match the contract read by extractPartsFromGLTF() below, point
-// CONFIG.model.url at it, and everything else (animation, interaction,
-// speech, section-awareness) keeps working unchanged.
+// SWITCHING TO A REAL 3D MODEL LATER: set CONFIG.model.type = "glb" in
+// config.js. createRenderer() below is the one place that reads that value;
+// a future GLB renderer just needs to build the same `parts` shape that
+// buildPngRenderer() returns (floater/tilter wrappers, eyelidL/R, eyeGlowL/R,
+// mouthGlow, hologram, zones) so robot-animation.js and the interaction
+// wiring in this file keep working completely unchanged.
 
-import * as THREE from "./vendor/three.module.min.js";
 import { CONFIG } from "./config.js";
-import { state } from "./state.js";
-import { on } from "./events.js";
-import { audio } from "./audio.js";
-import { createAnimator } from "./animation.js";
-import { createInteraction } from "./interaction.js";
-import { createSpeech } from "./speech.js";
-import { createEmotion } from "./emotion.js";
-
-function makeShadowTexture() {
-  const size = 64;
-  const c = document.createElement("canvas");
-  c.width = c.height = size;
-  const g = c.getContext("2d");
-  const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  grad.addColorStop(0, "rgba(0,0,0,0.35)");
-  grad.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = grad;
-  g.fillRect(0, 0, size, size);
-  return new THREE.CanvasTexture(c);
-}
-
-function buildHolograms() {
-  const mat = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.8, wireframe: true });
-  const solidMat = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.55 });
-  const accent = CONFIG.colors.accentGlow;
-
-  const cloud = new THREE.Group();
-  [[-0.06, 0, 0.02], [0.06, 0, 0.02], [0, 0.03, 0.04]].forEach(([x, y, extra]) => {
-    const puff = new THREE.Mesh(new THREE.SphereGeometry(0.07 + extra, 10, 10), solidMat(accent));
-    puff.position.set(x, y, 0);
-    cloud.add(puff);
-  });
-
-  const security = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.16, 4), mat(accent));
-  security.rotation.x = Math.PI;
-
-  const ai = new THREE.Group();
-  const aiCore = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 0), solidMat(accent));
-  const aiRing = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.006, 8, 24), mat(accent));
-  aiRing.rotation.x = Math.PI / 2.4;
-  ai.add(aiCore, aiRing);
-
-  const server = new THREE.Group();
-  for (let i = 0; i < 3; i++) {
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.035, 0.1), solidMat(accent));
-    slab.position.y = i * 0.045 - 0.045;
-    server.add(slab);
-  }
-
-  const network = new THREE.Group();
-  const nodePositions = [
-    [0, 0.08, 0],
-    [0.09, -0.05, 0],
-    [-0.09, -0.05, 0],
-  ];
-  nodePositions.forEach((p) => {
-    const node = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), solidMat(accent));
-    node.position.set(...p);
-    network.add(node);
-  });
-  const lineMat = new THREE.LineBasicMaterial({ color: accent, transparent: true, opacity: 0.7 });
-  for (let i = 0; i < nodePositions.length; i++) {
-    for (let j = i + 1; j < nodePositions.length; j++) {
-      const geo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(...nodePositions[i]),
-        new THREE.Vector3(...nodePositions[j]),
-      ]);
-      network.add(new THREE.Line(geo, lineMat));
-    }
-  }
-
-  const holo = { cloud, security, ai, server, network };
-  for (const h of Object.values(holo)) h.visible = false;
-  return holo;
-}
-
-function buildRobot() {
-  const parts = {};
-  const hitMeshes = [];
-  const invisible = () => new THREE.MeshBasicMaterial({ visible: false });
-
-  const matPrimary = () => new THREE.MeshStandardMaterial({ color: CONFIG.colors.primary, roughness: 0.5, metalness: 0.08 });
-  const matSecondary = () => new THREE.MeshStandardMaterial({ color: CONFIG.colors.secondary, roughness: 0.55, metalness: 0.2 });
-  const matAccent = (intensity = 1) =>
-    new THREE.MeshStandardMaterial({ color: CONFIG.colors.accent, emissive: CONFIG.colors.accent, emissiveIntensity: intensity, roughness: 0.35, metalness: 0.1 });
-
-  const group = new THREE.Group(); // drag target / home-position anchor
-  const root = new THREE.Group(); // idle-animation target (breathing/floating/gestures)
-  group.add(root);
-
-  // ---- contact shadow ----
-  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: makeShadowTexture(), transparent: true, depthWrite: false }));
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.position.y = -1.05;
-  root.add(shadow);
-
-  // ---- body ----
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.46, 0.5, 6, 14), matPrimary());
-  root.add(body);
-
-  const chestBack = new THREE.Mesh(new THREE.CircleGeometry(0.2, 20), matSecondary());
-  chestBack.position.set(0, 0.05, 0.46);
-  root.add(chestBack);
-
-  const core = new THREE.Mesh(new THREE.CircleGeometry(0.09, 20), matAccent(1.2));
-  core.position.set(0, 0.05, 0.468);
-  root.add(core);
-
-  const bodyHit = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 8), invisible());
-  bodyHit.position.y = -0.05;
-  bodyHit.userData.part = "body";
-  root.add(bodyHit);
-  hitMeshes.push(bodyHit);
-
-  // ---- head ----
-  const head = new THREE.Group();
-  head.position.set(0, 0.86, 0);
-  root.add(head);
-
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 18), matPrimary());
-  skull.scale.set(1, 0.94, 0.98);
-  head.add(skull);
-
-  const visor = new THREE.Mesh(new THREE.CircleGeometry(0.28, 24), matSecondary());
-  visor.position.set(0, -0.02, 0.385);
-  head.add(visor);
-
-  const eyeGeo = new THREE.BoxGeometry(0.085, 0.05, 0.02);
-  const eyeMat = () => new THREE.MeshStandardMaterial({ color: CONFIG.colors.eye, emissive: CONFIG.colors.eye, emissiveIntensity: 1, roughness: 0.2 });
-  const eyeL = new THREE.Mesh(eyeGeo, eyeMat());
-  eyeL.position.set(-0.1, -0.01, 0.4);
-  head.add(eyeL);
-  const eyeR = new THREE.Mesh(eyeGeo, eyeMat());
-  eyeR.position.set(0.1, -0.01, 0.4);
-  head.add(eyeR);
-
-  const mouths = {};
-  mouths.neutral = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 0.02), matAccent(0.8));
-  mouths.smile = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.014, 8, 16, Math.PI), matAccent(0.8));
-  mouths.smile.rotation.z = Math.PI;
-  mouths.surprised = new THREE.Mesh(new THREE.RingGeometry(0.03, 0.05, 16), matAccent(0.8));
-  mouths.laugh = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.03, 8, 16, Math.PI), matAccent(0.9));
-  mouths.laugh.rotation.z = Math.PI;
-  for (const m of Object.values(mouths)) {
-    m.position.set(0, -0.13, 0.4);
-    m.visible = false;
-    head.add(m);
-  }
-  mouths.neutral.visible = true;
-
-  const antennaStick = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, 0.22, 8), matSecondary());
-  antennaStick.position.set(0, 0.42, 0);
-  head.add(antennaStick);
-  const antennaTip = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 12), matAccent(1.4));
-  antennaTip.position.set(0, 0.54, 0);
-  head.add(antennaTip);
-
-  const headHit = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 8), invisible());
-  headHit.position.set(0, 0.14, -0.05);
-  headHit.userData.part = "head";
-  head.add(headHit);
-  hitMeshes.push(headHit);
-
-  // Tighter than the old full-face disc — sits right over the eye/visor band
-  // so "eyes" (wink/happy/surprised) and "head" (nod/blink/smile) are two
-  // genuinely distinct clickable zones instead of overlapping.
-  const eyesHit = new THREE.Mesh(new THREE.CircleGeometry(0.2, 12), invisible());
-  eyesHit.position.set(0, -0.01, 0.395);
-  eyesHit.userData.part = "eyes";
-  head.add(eyesHit);
-  hitMeshes.push(eyesHit);
-
-  // ---- arms ----
-  function buildArm(sign) {
-    const shoulder = new THREE.Group();
-    shoulder.position.set(sign * 0.5, 0.2, 0);
-    root.add(shoulder);
-
-    const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.28, 4, 8), matPrimary());
-    upper.position.set(sign * 0.05, -0.18, 0);
-    upper.rotation.z = sign * 0.15;
-    shoulder.add(upper);
-
-    const hand = new THREE.Group();
-    hand.position.set(sign * 0.09, -0.42, 0);
-    shoulder.add(hand);
-    const palm = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 12), matSecondary());
-    hand.add(palm);
-
-    const armHit = new THREE.Mesh(new THREE.CapsuleGeometry(0.14, 0.4, 4, 8), invisible());
-    armHit.position.set(sign * 0.05, -0.25, 0);
-    armHit.userData.part = sign < 0 ? "armL" : "armR";
-    shoulder.add(armHit);
-    hitMeshes.push(armHit);
-
-    return { shoulder, hand };
-  }
-  const armLParts = buildArm(-1);
-  const armRParts = buildArm(1);
-
-  // ---- tablet (held by right hand) ----
-  const tabletGroup = new THREE.Group();
-  tabletGroup.position.set(0.02, -0.02, 0.1);
-  armRParts.hand.add(tabletGroup);
-  const tabletFrame = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.3, 0.018), matSecondary());
-  tabletGroup.add(tabletFrame);
-  const tabletScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.24), matAccent(0.9));
-  tabletScreen.position.z = 0.011;
-  tabletGroup.add(tabletScreen);
-  const tabletHit = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.38, 0.1), invisible());
-  tabletHit.userData.part = "tablet";
-  tabletGroup.add(tabletHit);
-  hitMeshes.push(tabletHit);
-
-  // ---- legs ----
-  function buildLeg(sign) {
-    const hip = new THREE.Group();
-    hip.position.set(sign * 0.2, -0.52, 0);
-    root.add(hip);
-    const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.32, 10), matSecondary());
-    shin.position.y = -0.16;
-    hip.add(shin);
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.22), matPrimary());
-    foot.position.set(0, -0.33, 0.04);
-    hip.add(foot);
-    // Shin/upper-leg zone (lift leg) stops short of the foot pad below it.
-    const legHit = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.2, 4, 8), invisible());
-    legHit.position.y = -0.13;
-    legHit.userData.part = sign < 0 ? "legL" : "legR";
-    hip.add(legHit);
-    hitMeshes.push(legHit);
-    // Foot pad zone (jump) is a separate, smaller region at the very bottom.
-    const footHit = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.28), invisible());
-    footHit.position.set(0, -0.33, 0.04);
-    footHit.userData.part = sign < 0 ? "footL" : "footR";
-    hip.add(footHit);
-    hitMeshes.push(footHit);
-    return hip;
-  }
-  const legL = buildLeg(-1);
-  const legR = buildLeg(1);
-
-  // ---- handheld props (coffee / wrench / shield) on left hand ----
-  const propAnchor = new THREE.Group();
-  armLParts.hand.add(propAnchor);
-  const props = {};
-
-  const coffee = new THREE.Group();
-  coffee.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.045, 0.09, 10), matSecondary()));
-  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.008, 6, 10), matSecondary());
-  handle.position.x = 0.06;
-  handle.rotation.y = Math.PI / 2;
-  coffee.add(handle);
-  props.coffee = coffee;
-
-  props.wrench = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.16, 0.02), matSecondary());
-
-  const shield = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.14, 4), matAccent(1));
-  shield.rotation.x = Math.PI;
-  props.shield = shield;
-
-  for (const p of [coffee, props.wrench, shield]) {
-    p.visible = false;
-    p.position.set(0, -0.06, 0.02);
-    propAnchor.add(p);
-  }
-
-  const drone = new THREE.Group();
-  drone.add(new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 10), matPrimary()));
-  for (const [dx, dz] of [
-    [0.07, 0.07],
-    [-0.07, 0.07],
-    [0.07, -0.07],
-    [-0.07, -0.07],
-  ]) {
-    const propBlade = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.006, 8), matAccent(0.6));
-    propBlade.position.set(dx, 0.02, dz);
-    drone.add(propBlade);
-  }
-  drone.visible = false;
-  root.add(drone);
-  props.drone = drone;
-
-  // ---- hologram anchor (above tablet) ----
-  const hologramAnchor = new THREE.Group();
-  hologramAnchor.position.set(0, 1.5, 0);
-  hologramAnchor.visible = false;
-  root.add(hologramAnchor);
-  const holograms = buildHolograms();
-  for (const h of Object.values(holograms)) hologramAnchor.add(h);
-
-  // ---- cape (superhero easter egg) ----
-  const cape = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.5, 0.6, 4, 6),
-    new THREE.MeshStandardMaterial({ color: 0xf36a1f, side: THREE.DoubleSide, roughness: 0.6, transparent: true, opacity: 0.92 })
-  );
-  cape.position.set(0, 0.1, -0.32);
-  cape.scale.y = 0;
-  cape.visible = false;
-  root.add(cape);
-
-  Object.assign(parts, {
-    group, root, body, head, skull,
-    eyeL, eyeR, eyeScale: { x: 1 }, mouths, core, antennaTip,
-    armL: armLParts.shoulder, armR: armRParts.shoulder, handR: armRParts.hand, handL: armLParts.hand,
-    legL, legR, propAnchor, props, hologramAnchor, holograms, cape,
-  });
-
-  return { group, parts, hitMeshes };
-}
-
-// Future-proofing stub: a real .glb should name its nodes to match this
-// contract. Anything missing falls back to a console warning + procedural
-// build so the widget never breaks while an asset is in progress.
-async function loadFromGLTF(url) {
-  const { GLTFLoader } = await import("./vendor/GLTFLoader.js");
-  const loader = new GLTFLoader();
-  if (CONFIG.model.dracoDecoderPath) {
-    const { DRACOLoader } = await import("./vendor/DRACOLoader.js").catch(() => ({ DRACOLoader: null }));
-    if (DRACOLoader) {
-      const draco = new DRACOLoader();
-      draco.setDecoderPath(CONFIG.model.dracoDecoderPath);
-      loader.setDRACOLoader(draco);
-    }
-  }
-  const gltf = await new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
-  const scene = gltf.scene;
-  const required = ["group", "body", "head", "armL", "armR", "legL", "legR", "eyeL", "eyeR", "core", "antennaTip", "handR", "handL", "propAnchor", "hologramAnchor", "cape"];
-  const parts = {};
-  const missing = [];
-  for (const key of required) {
-    const found = scene.getObjectByName(key);
-    if (found) parts[key] = found;
-    else missing.push(key);
-  }
-  if (missing.length) {
-    console.warn(`[iTech Robot] GLB "${url}" is missing named nodes: ${missing.join(", ")}. Falling back to procedural robot.`);
-    return null;
-  }
-  parts.root = parts.group;
-  parts.eyeScale = { x: 1 };
-  parts.mouths = {};
-  ["neutral", "smile", "surprised", "laugh"].forEach((n) => {
-    const m = scene.getObjectByName(`mouth_${n}`);
-    if (m) parts.mouths[n] = m;
-  });
-  parts.props = {};
-  ["coffee", "wrench", "shield", "drone"].forEach((n) => {
-    const p = scene.getObjectByName(`prop_${n}`);
-    if (p) parts.props[n] = p;
-  });
-  parts.holograms = {};
-  CONFIG.hologramTopics.forEach((n) => {
-    const h = scene.getObjectByName(`holo_${n}`);
-    if (h) parts.holograms[n] = h;
-  });
-  const hitMeshes = [];
-  scene.traverse((obj) => {
-    if (obj.userData && obj.userData.part) hitMeshes.push(obj);
-  });
-  return { group: scene, parts, hitMeshes };
-}
+import { state } from "./robot-state.js";
+import { on } from "./robot-events.js";
+import { audio } from "./robot-audio.js";
+import { createAnimator } from "./robot-animation.js";
+import { createSpeech } from "./robot-speech.js";
 
 function injectStylesheet() {
   const href = new URL("./css/robot.css", import.meta.url).href;
@@ -381,6 +26,96 @@ function injectStylesheet() {
   link.rel = "stylesheet";
   link.href = href;
   document.head.appendChild(link);
+}
+
+function zoneStyle(z) {
+  return `top:${z.top}%;left:${z.left}%;width:${z.width}%;height:${z.height}%;`;
+}
+
+/**
+ * Builds the PNG-based renderer: a plain DOM/CSS mascot. Returns the same
+ * `parts` shape any future renderer (e.g. a GLB one) must also return.
+ */
+function buildPngRenderer(container) {
+  const floater = document.createElement("div");
+  floater.className = "itech-robot-floater";
+  container.appendChild(floater);
+
+  const tilter = document.createElement("div");
+  tilter.className = "itech-robot-tilter";
+  floater.appendChild(tilter);
+
+  const img = document.createElement("img");
+  img.className = "itech-robot-img";
+  img.src = `${CONFIG.model.pngUrl}?v=${CONFIG.model.pngVersion}`;
+  img.alt = "iTech Cambodia AI mascot";
+  img.draggable = false;
+  tilter.appendChild(img);
+
+  const eyelidL = document.createElement("div");
+  eyelidL.className = "itech-robot-eyelid";
+  Object.assign(eyelidL.style, eyeStyle(CONFIG.eyeOverlay.left));
+  tilter.appendChild(eyelidL);
+
+  const eyelidR = document.createElement("div");
+  eyelidR.className = "itech-robot-eyelid";
+  Object.assign(eyelidR.style, eyeStyle(CONFIG.eyeOverlay.right));
+  tilter.appendChild(eyelidR);
+
+  const eyeGlowL = document.createElement("div");
+  eyeGlowL.className = "itech-robot-eyeglow";
+  Object.assign(eyeGlowL.style, eyeGlowStyle(CONFIG.eyeOverlay.left));
+  tilter.appendChild(eyeGlowL);
+
+  const eyeGlowR = document.createElement("div");
+  eyeGlowR.className = "itech-robot-eyeglow";
+  Object.assign(eyeGlowR.style, eyeGlowStyle(CONFIG.eyeOverlay.right));
+  tilter.appendChild(eyeGlowR);
+
+  const mouthGlow = document.createElement("div");
+  mouthGlow.className = "itech-robot-mouthglow";
+  const m = CONFIG.mouthOverlay;
+  Object.assign(mouthGlow.style, { top: `${m.top}%`, left: `${m.left}%`, width: `${m.width}%`, height: `${m.height}%` });
+  tilter.appendChild(mouthGlow);
+
+  const zones = {};
+  for (const [part, z] of Object.entries(CONFIG.hitZones)) {
+    const el = document.createElement("div");
+    el.className = "itech-robot-zone";
+    el.dataset.part = part;
+    el.style.cssText = zoneStyle(z);
+    tilter.appendChild(el);
+    zones[part] = el;
+  }
+
+  const hologram = document.createElement("div");
+  hologram.className = "itech-robot-hologram";
+  const t = CONFIG.hitZones.tablet;
+  hologram.style.left = `${t.left + t.width / 2}%`;
+  hologram.style.top = `${t.top}%`;
+  tilter.appendChild(hologram);
+
+  return { floater, tilter, eyelidL, eyelidR, eyeGlowL, eyeGlowR, mouthGlow, hologram, zones };
+}
+
+function eyeStyle(e) {
+  const s = e.size;
+  return { top: `${e.top}%`, left: `${e.left}%`, width: `${s}%`, height: `${s}%` };
+}
+function eyeGlowStyle(e) {
+  const s = e.size * 0.4;
+  return { top: `${e.top + e.size * 0.3}%`, left: `${e.left + e.size * 0.3}%`, width: `${s}%`, height: `${s}%` };
+}
+
+/** The one place CONFIG.model.type is read — see file header. */
+function createRenderer(container) {
+  if (CONFIG.model.type === "glb") {
+    console.warn(
+      "[iTech Robot] model.type is \"glb\" but no GLB renderer is implemented yet — falling back to the PNG mascot. " +
+        "A future renderer module just needs to return the same `parts` shape as buildPngRenderer()."
+    );
+  }
+  return buildPngRenderer(container);
 }
 
 function buildDOM() {
@@ -392,112 +127,205 @@ function buildDOM() {
   container.setAttribute("role", "img");
   container.setAttribute("aria-label", CONFIG.a11y.label);
   document.body.appendChild(container);
-
-  const canvas = document.createElement("canvas");
-  canvas.className = "itech-robot-canvas";
-  container.appendChild(canvas);
-
-  return { container, canvas };
+  return container;
 }
 
-async function boot() {
-  const { container, canvas } = buildDOM();
-
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, 1, CONFIG.camera.near, CONFIG.camera.far);
-  camera.position.set(0, 0.15, CONFIG.camera.z);
-  camera.lookAt(0, 0.05, 0);
-
-  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-  const key = new THREE.DirectionalLight(0xffffff, 0.85);
-  key.position.set(1.2, 2, 2.5);
-  scene.add(key);
-  const rim = new THREE.PointLight(CONFIG.colors.accent, 0.7, 4);
-  rim.position.set(-0.6, 0.6, 1.4);
-  scene.add(rim);
-
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-  renderer.setClearColor(0x000000, 0);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, CONFIG.performance.maxPixelRatio));
-
-  let built = CONFIG.model.url ? await loadFromGLTF(CONFIG.model.url).catch((err) => (console.warn("[iTech Robot] GLB load failed, using procedural robot.", err), null)) : null;
-  if (!built) built = buildRobot();
-  const { group, parts, hitMeshes } = built;
-  scene.add(group);
-
-  const ctx = { scene, camera, renderer, canvas, container, parts, hitMeshes };
-
-  const animator = createAnimator(ctx);
-  const speaker = createSpeech(ctx);
-  const emotion = createEmotion(animator);
-  const interactionCtl = createInteraction(ctx, animator, speaker, emotion);
-
-  function resize() {
-    const rect = container.getBoundingClientRect();
-    const w = Math.max(1, rect.width);
-    const h = Math.max(1, rect.height);
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+function readGreeted() {
+  try {
+    return sessionStorage.getItem(CONFIG.session.greetedKey) === "1";
+  } catch {
+    return false;
   }
-  if ("ResizeObserver" in window) {
-    new ResizeObserver(resize).observe(container);
-  } else {
-    window.addEventListener("resize", resize);
+}
+function writeGreeted() {
+  try {
+    sessionStorage.setItem(CONFIG.session.greetedKey, "1");
+  } catch {
+    /* private-mode storage may throw — non-fatal, just re-greets next load */
   }
-  resize();
+}
+
+function boot() {
+  const container = buildDOM();
+  const { floater, tilter, eyelidL, eyelidR, eyeGlowL, eyeGlowR, mouthGlow, hologram, zones } = createRenderer(container);
+  const animator = createAnimator({ floater, tilter, eyelidL, eyelidR, eyeGlowL, eyeGlowR, mouthGlow, hologram });
+  const speaker = createSpeech(container);
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) window.gsap?.globalTimeline.pause();
     else window.gsap?.globalTimeline.resume();
   });
 
-  function tick() {
-    requestAnimationFrame(tick);
-    if (document.hidden) return;
-    if (parts.hologramAnchor.visible) parts.hologramAnchor.rotation.y += 0.014;
-    if (parts.props.drone.visible) {
-      parts.props.drone.children.slice(1).forEach((blade) => (blade.rotation.y += 0.9));
-    }
-    renderer.render(scene, camera);
-  }
-  requestAnimationFrame(tick);
-
   animator.start();
 
-  // ---------- greeting: once per visitor session, not every page load ----------
-  const session = readSessionFlags();
-  if (!session.greeted) {
+  // ---------- per-body-part reactions ----------
+  function reactToPart(part) {
+    if (animator.isBusy()) return;
+    switch (part) {
+      case "head":
+        return animator.nod();
+      case "eyes":
+        return animator.faceReaction();
+      case "body":
+        return animator.bounceLaugh();
+      case "armL":
+        return animator.wave();
+      case "armR":
+        return animator.thumbsUp();
+      case "legL":
+      case "legR":
+        return animator.legReaction();
+      case "tablet": {
+        const topic = CONFIG.hologramTopics[Math.floor(Math.random() * CONFIG.hologramTopics.length)];
+        animator.showHologram(topic);
+        audio.thinking();
+        speaker.say(`Showing ${topic} overview`, 2200);
+        return;
+      }
+      default:
+        return;
+    }
+  }
+
+  let lastClickAt = 0;
+  container.addEventListener("click", (e) => {
+    const zoneEl = e.target.closest?.(".itech-robot-zone");
+    const now = performance.now();
+    const isDoubleClick = now - lastClickAt < CONFIG.timing.doubleClickWindowMs;
+    lastClickAt = now;
+
+    if (isDoubleClick) {
+      animator.celebrate(() => spawnConfetti(container));
+      speaker.say("Yay! 🎉", 2200);
+      return;
+    }
+    if (!zoneEl) return;
+    const count = state.registerClick();
+    reactToPart(zoneEl.dataset.part);
+    if (count === CONFIG.easterEggs.clickCount) {
+      setTimeout(() => {
+        animator.dance();
+        speaker.say("Whee! You found my dance! 🕺", 2600);
+      }, 500);
+    }
+  });
+
+  // ---------- keyboard accessibility ----------
+  container.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (!animator.isBusy()) {
+        animator.greetWave();
+        speaker.say(CONFIG.greetings[Math.floor(Math.random() * CONFIG.greetings.length)]);
+      }
+    } else if (e.key === "Escape") {
+      speaker.hide();
+    }
+  });
+
+  // ---------- cursor follow (max CONFIG.camera.maxTiltDeg) ----------
+  let cursorRaf = null;
+  window.addEventListener(
+    "pointermove",
+    (e) => {
+      if (cursorRaf) return;
+      cursorRaf = requestAnimationFrame(() => {
+        cursorRaf = null;
+        const rect = container.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const dx = e.clientX - cx;
+        const dy = e.clientY - cy;
+        const dist = Math.hypot(dx, dy);
+        const approachRadius = 420;
+        if (dist < approachRadius && !animator.isBusy()) {
+          state.setCursor(dx, dy, true);
+          animator.lookAt(Math.max(-1, Math.min(1, dx / approachRadius)), Math.max(-1, Math.min(1, dy / approachRadius)));
+        } else if (state.cursor.active) {
+          state.setCursor(0, 0, false);
+          if (!animator.isBusy()) animator.returnToRest(0.8);
+        }
+      });
+    },
+    { passive: true }
+  );
+
+  // ---------- scroll: look up/down ----------
+  let lastScrollY = window.scrollY;
+  let scrollEndTimer = null;
+  window.addEventListener(
+    "scroll",
+    () => {
+      const y = window.scrollY;
+      const dir = y > lastScrollY ? 1 : -1;
+      lastScrollY = y;
+      if (!animator.isBusy() && !state.cursor.active) animator.lookAt(0, dir * 0.35);
+      clearTimeout(scrollEndTimer);
+      scrollEndTimer = setTimeout(() => {
+        if (!animator.isBusy() && !state.cursor.active) animator.returnToRest(0.7);
+      }, 180);
+    },
+    { passive: true }
+  );
+
+  // ---------- CTA hover-point / click-celebrate ----------
+  let lastPointCooldown = 0;
+  document.addEventListener(
+    "pointerover",
+    (e) => {
+      const cta = e.target.closest?.(CONFIG.ctaSelectors) || e.target.closest?.(CONFIG.hoverAwareness.selectors);
+      if (!cta || animator.isBusy()) return;
+      const now = performance.now();
+      if (now - lastPointCooldown < 1200) return;
+      lastPointCooldown = now;
+      const rect = container.getBoundingClientRect();
+      const robotCx = rect.left + rect.width / 2;
+      const targetRect = cta.getBoundingClientRect();
+      animator.pointTo(targetRect.left + targetRect.width / 2 < robotCx ? -1 : 1);
+    },
+    { passive: true }
+  );
+
+  // Form submit buttons are excluded: a click doesn't mean success. The
+  // contact form instead calls window.iTechRobot.celebrate() on a real
+  // confirmed send — see js/main.js.
+  document.addEventListener(
+    "click",
+    (e) => {
+      const cta = e.target.closest?.(CONFIG.ctaSelectors);
+      if (!cta || cta.matches('button[type="submit"]') || animator.isBusy()) return;
+      animator.celebrate(() => spawnConfetti(container));
+      audio.happy();
+    },
+    { passive: true }
+  );
+
+  // ---------- section awareness ----------
+  const sections = document.querySelectorAll("section[id], [data-robot-section]");
+  if (sections.length && "IntersectionObserver" in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((en) => en.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible) {
+          const id = visible.target.dataset.robotSection || visible.target.id;
+          if (CONFIG.sectionMessages[id]) state.setSection(id);
+        }
+      },
+      { threshold: [0.4, 0.6] }
+    );
+    sections.forEach((s) => io.observe(s));
+  }
+
+  // ---------- greeting: once per visitor session ----------
+  if (!readGreeted()) {
     setTimeout(() => {
       animator.greetWave();
       speaker.say(CONFIG.greetings[Math.floor(Math.random() * CONFIG.greetings.length)]);
-      audio.hello();
-      writeSessionFlag(CONFIG.session.greetedKey);
+      writeGreeted();
     }, CONFIG.timing.greetingDelayMs);
   }
-
-  // ---------- "thanks for visiting" after 60s cumulative time on site ----------
-  if (!session.thanked) {
-    const elapsed = Date.now() - session.start;
-    const remaining = Math.max(0, CONFIG.timing.dwellThankYouMs - elapsed);
-    setTimeout(() => {
-      if (readSessionFlags().thanked || state.asleep) return;
-      speaker.say("Thanks for visiting iTech Cambodia. 🙏");
-      writeSessionFlag(CONFIG.session.thankedKey);
-    }, remaining);
-  }
-
-  // ---------- sleep / wake (idle-timeout bonus feature) ----------
-  on("sleep", () => {
-    emotion.set("sleeping");
-    speaker.say("💤", 999999);
-  });
-  on("wake", () => {
-    // emotion.set() below transitions out of "sleeping" via its own leave()
-    // hook, which already calls animator.wakePose() — no need to call it here.
-    emotion.set("waiting");
-    speaker.hide();
-  });
 
   // ---------- public API + plugin system for future LLM/AI-employee integration ----------
   const plugins = new Map();
@@ -506,28 +334,21 @@ async function boot() {
     hideSpeech: () => speaker.hide(),
     mute: (v) => state.setMuted(v !== undefined ? v : !state.muted),
     isMuted: () => state.muted,
-    setMood: (name) => animator.setExpression(name),
-    setEmotion: (name, opts) => emotion.set(name, opts),
-    getEmotion: () => emotion.get(),
     wave: () => animator.wave(),
     nod: () => animator.nod(),
-    celebrate: () => (animator.celebrate(() => speaker.confetti()), audio.yay()),
+    celebrate: () => (animator.celebrate(() => spawnConfetti(container)), audio.happy()),
     showHologram: (topic, ms) => animator.showHologram(topic, ms),
     navigateTo: (url) => {
       window.location.href = url;
     },
     registerPlugin(name, plugin) {
       plugins.set(name, plugin);
-      if (typeof plugin.onInit === "function") {
-        plugin.onInit({ animator, speaker, emotion, state, ctx });
-      }
+      if (typeof plugin.onInit === "function") plugin.onInit({ animator, speaker, state });
       return () => plugins.delete(name);
     },
     getPlugin: (name) => plugins.get(name),
     destroy() {
-      interactionCtl.destroy();
       animator.stop();
-      renderer.dispose();
       container.remove();
       delete window.iTechRobot;
     },
@@ -536,31 +357,50 @@ async function boot() {
   container.dispatchEvent(new CustomEvent("itech-robot:ready", { bubbles: true }));
 }
 
-/** sessionStorage is per-tab and persists across page navigations within it —
- * exactly what "once per visitor session" and "60s cumulative on site" need. */
-function readSessionFlags() {
-  try {
-    let start = Number(sessionStorage.getItem(CONFIG.session.startKey));
-    if (!start) {
-      start = Date.now();
-      sessionStorage.setItem(CONFIG.session.startKey, String(start));
+// ---------- confetti (double-click / CTA-click celebration) ----------
+function spawnConfetti(container) {
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  const canvas = document.createElement("canvas");
+  canvas.className = "itech-robot-confetti";
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  document.body.appendChild(canvas);
+  const c2d = canvas.getContext("2d");
+  const rect = container.getBoundingClientRect();
+  const originX = rect.left + rect.width / 2;
+  const originY = rect.top + rect.height / 2;
+  const colors = ["#3ec6ff", "#f36a1f", "#ffffff", "#8fe3ff", "#0e1f3d"];
+  const pieces = Array.from({ length: 42 }, () => ({
+    x: originX,
+    y: originY,
+    vx: (Math.random() - 0.5) * 9,
+    vy: -Math.random() * 8 - 3,
+    size: 4 + Math.random() * 4,
+    color: colors[(Math.random() * colors.length) | 0],
+    rot: Math.random() * Math.PI,
+    vr: (Math.random() - 0.5) * 0.4,
+  }));
+  let frame = 0;
+  const maxFrames = 90;
+  function step() {
+    frame += 1;
+    c2d.clearRect(0, 0, canvas.width, canvas.height);
+    for (const p of pieces) {
+      p.vy += 0.22;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vr;
+      c2d.save();
+      c2d.translate(p.x, p.y);
+      c2d.rotate(p.rot);
+      c2d.fillStyle = p.color;
+      c2d.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+      c2d.restore();
     }
-    return {
-      start,
-      greeted: sessionStorage.getItem(CONFIG.session.greetedKey) === "1",
-      thanked: sessionStorage.getItem(CONFIG.session.thankedKey) === "1",
-    };
-  } catch {
-    return { start: Date.now(), greeted: false, thanked: false };
+    if (frame < maxFrames) requestAnimationFrame(step);
+    else canvas.remove();
   }
-}
-
-function writeSessionFlag(key) {
-  try {
-    sessionStorage.setItem(key, "1");
-  } catch {
-    /* private-mode storage may throw — non-fatal, just re-greets next load */
-  }
+  requestAnimationFrame(step);
 }
 
 function scheduleBoot() {

@@ -1,50 +1,105 @@
-/* iTech Cambodia — AI Robot Mascot
-   Sizing/position mirrors robot/config.js CONFIG.size / CONFIG.position —
-   keep both in sync if you change one. */
+/* iTech Cambodia — AI Robot Mascot (PNG-based)
+   Sizing/position/hit-zones mirror robot/config.js — keep both in sync. */
 
 .itech-robot {
   position: fixed;
-  right: 24px;
-  bottom: 90px; /* clears the site's .back-top button */
+  right: 30px;
+  bottom: 25px;
   width: 140px;
-  height: 140px;
   z-index: 950;
-  cursor: grab;
-  touch-action: none;
-  -webkit-tap-highlight-color: transparent;
   outline: none;
+  -webkit-tap-highlight-color: transparent;
 }
-.itech-robot:active { cursor: grabbing; }
 .itech-robot:focus-visible {
   outline: 2px solid #3ec6ff;
-  outline-offset: 6px;
+  outline-offset: 8px;
   border-radius: 50%;
 }
 
-.itech-robot-canvas {
+@media (max-width: 1024px) {
+  .itech-robot { width: 110px; right: 22px; bottom: 22px; }
+}
+@media (max-width: 600px) {
+  .itech-robot { width: 90px; right: 14px; bottom: 18px; }
+}
+
+.itech-robot-floater,
+.itech-robot-tilter {
+  position: relative;
+  width: 100%;
+}
+.itech-robot-tilter {
+  will-change: transform;
+  filter: brightness(1) drop-shadow(0 10px 14px rgba(14, 31, 61, 0.28));
+}
+
+.itech-robot-img {
   display: block;
   width: 100%;
-  height: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
 }
 
-/* Tablet */
-@media (max-width: 1024px) {
-  .itech-robot {
-    width: 110px;
-    height: 110px;
-    right: 18px;
-    bottom: 84px;
-  }
+/* ---------- simulated eyelids / eye-glow / mouth-glow ---------- */
+.itech-robot-eyelid {
+  position: absolute;
+  background: #0b1220;
+  border-radius: 50%;
+  transform: scaleY(0);
+  pointer-events: none;
+}
+.itech-robot-eyeglow {
+  position: absolute;
+  background: radial-gradient(circle, #ffffff 0%, #8fe3ff 55%, transparent 75%);
+  border-radius: 50%;
+  box-shadow: 0 0 6px 1px rgba(143, 227, 255, 0.85);
+  pointer-events: none;
+}
+.itech-robot-mouthglow {
+  position: absolute;
+  background: radial-gradient(ellipse, rgba(143, 227, 255, 0.9), rgba(62, 198, 255, 0.15) 70%, transparent);
+  border-radius: 999px;
+  opacity: 0.55;
+  filter: blur(1.5px);
+  pointer-events: none;
 }
 
-/* Mobile */
-@media (max-width: 600px) {
-  .itech-robot {
-    width: 90px;
-    height: 90px;
-    right: 14px;
-    bottom: 76px;
-  }
+/* ---------- invisible per-body-part click zones ---------- */
+.itech-robot-zone {
+  position: absolute;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* ---------- hologram popup (tablet reaction) ---------- */
+.itech-robot-hologram {
+  position: absolute;
+  transform: translate(-50%, -100%) scale(0.85);
+  margin-top: -6px;
+  padding: 6px 12px;
+  background: rgba(14, 31, 61, 0.92);
+  color: #8fe3ff;
+  border: 1px solid rgba(143, 227, 255, 0.5);
+  border-radius: 10px;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  box-shadow: 0 0 18px rgba(62, 198, 255, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.itech-robot-hologram.show {
+  opacity: 1;
+  transform: translate(-50%, -100%) scale(1);
+  animation: itech-holo-flicker 1.8s ease-in-out infinite;
+}
+@keyframes itech-holo-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.82; }
 }
 
 /* ---------- speech bubble ---------- */
@@ -117,4 +172,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .itech-robot-bubble { transition: opacity 0.12s linear; transform: none !important; }
+  .itech-robot-hologram.show { animation: none; }
 }

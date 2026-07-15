@@ -1,13 +1,13 @@
 // iTech Cambodia — AI Robot Mascot — speech bubble + text-to-speech
 // Builds its own DOM (bubble + mute toggle). Every spoken line shows in the
 // bubble immediately; the voice (SpeechSynthesis) only starts once audio has
-// been unlocked by a user gesture (see audio.js) — browsers block it before
-// that regardless, so this mirrors the same "no autoplay" rule for voice.
+// been unlocked by a user gesture (see robot-audio.js) — mirrors the same
+// "no autoplay" rule for the voice as for sound effects.
 
-import { CONFIG, prefersReducedMotion } from "./config.js";
-import { state } from "./state.js";
-import { on } from "./events.js";
-import { audio } from "./audio.js";
+import { CONFIG } from "./config.js";
+import { state } from "./robot-state.js";
+import { on } from "./robot-events.js";
+import { audio } from "./robot-audio.js";
 
 let ttsVoice = null;
 function pickVoice() {
@@ -27,9 +27,7 @@ if (window.speechSynthesis) {
   };
 }
 
-export function createSpeech(ctx) {
-  const { container } = ctx;
-
+export function createSpeech(container) {
   const bubble = document.createElement("div");
   bubble.className = "itech-robot-bubble";
   bubble.setAttribute("role", "status");
@@ -77,7 +75,7 @@ export function createSpeech(ctx) {
     bubble.textContent = text;
     bubble.classList.add("show");
     clearTimeout(hideTimer);
-    if (ms > 0 && ms < 999999) hideTimer = setTimeout(hide, ms);
+    if (ms > 0) hideTimer = setTimeout(hide, ms);
     speakAloud(text);
   }
   function hide() {
@@ -88,58 +86,12 @@ export function createSpeech(ctx) {
   let lastSpokenAt = 0;
   on("section", (e) => {
     const msg = CONFIG.sectionMessages[e.detail.id];
-    if (!msg || state.asleep) return;
+    if (!msg) return;
     const now = performance.now();
     if (now - lastSpokenAt < 4000) return;
     lastSpokenAt = now;
     say(msg);
   });
 
-  // ---------- confetti (double-click celebration) ----------
-  function confetti() {
-    if (prefersReducedMotion()) return;
-    const canvas = document.createElement("canvas");
-    canvas.className = "itech-robot-confetti";
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    document.body.appendChild(canvas);
-    const c2d = canvas.getContext("2d");
-    const rect = ctx.container.getBoundingClientRect();
-    const originX = rect.left + rect.width / 2;
-    const originY = rect.top + rect.height / 2;
-    const colors = ["#3ec6ff", "#f36a1f", "#ffffff", "#8fe3ff", "#0e1f3d"];
-    const pieces = Array.from({ length: 42 }, () => ({
-      x: originX,
-      y: originY,
-      vx: (Math.random() - 0.5) * 9,
-      vy: -Math.random() * 8 - 3,
-      size: 4 + Math.random() * 4,
-      color: colors[(Math.random() * colors.length) | 0],
-      rot: Math.random() * Math.PI,
-      vr: (Math.random() - 0.5) * 0.4,
-    }));
-    let frame = 0;
-    const maxFrames = 90;
-    function step() {
-      frame += 1;
-      c2d.clearRect(0, 0, canvas.width, canvas.height);
-      for (const p of pieces) {
-        p.vy += 0.22;
-        p.x += p.vx;
-        p.y += p.vy;
-        p.rot += p.vr;
-        c2d.save();
-        c2d.translate(p.x, p.y);
-        c2d.rotate(p.rot);
-        c2d.fillStyle = p.color;
-        c2d.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
-        c2d.restore();
-      }
-      if (frame < maxFrames) requestAnimationFrame(step);
-      else canvas.remove();
-    }
-    requestAnimationFrame(step);
-  }
-
-  return { say, hide, confetti };
+  return { say, hide };
 }

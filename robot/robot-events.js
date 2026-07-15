@@ -1,7 +1,7 @@
 // iTech Cambodia — AI Robot Mascot — shared event bus
 // One EventTarget every module can publish/subscribe through, so robot.js,
-// animation.js, interaction.js, audio.js, speech.js and emotion.js never
-// need to import each other directly to react to what's happening.
+// robot-animation.js, robot-audio.js, robot-speech.js and robot-state.js
+// never need to import each other directly to react to what's happening.
 
 const bus = new EventTarget();
 
