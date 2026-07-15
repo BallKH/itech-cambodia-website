@@ -448,3 +448,41 @@ export async function loadStaticGlbRig(THREE, url) {
 
   return { group, bones, boundingSize: size, materials: null, isStatic: true };
 }
+
+/**
+ * Loads a flat, transparent-background PNG (e.g. the original reference
+ * art) as a single billboarded plane instead of a 3D model. The most
+ * reliable renderer of the three: MeshBasicMaterial is fully unlit, so
+ * whatever the PNG's pixels are is exactly what renders — no scene
+ * lighting, no PBR material factors, nothing that can wash the art out to
+ * white the way a lit fused-mesh .glb can. Same isStatic contract as
+ * loadStaticGlbRig(), so it reuses the same whole-body gesture set.
+ */
+export async function loadFlatPngRig(THREE, url) {
+  const texture = await new THREE.TextureLoader().loadAsync(url);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const img = texture.image;
+  const aspect = img.width / img.height;
+  const planeH = 1;
+  const planeW = planeH * aspect;
+
+  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(planeW, planeH), material);
+  mesh.userData.part = "torso"; // any click -> a generic whole-body reaction
+
+  const group = new THREE.Group();
+  group.add(mesh);
+
+  const bones = {};
+  for (const name of BONE_NAMES) {
+    const placeholder = new THREE.Group();
+    placeholder.name = name;
+    group.add(placeholder);
+    bones[name] = placeholder;
+  }
+
+  const box = new THREE.Box3().setFromObject(group);
+  const size = box.getSize(new THREE.Vector3());
+
+  return { group, bones, boundingSize: size, materials: null, isStatic: true };
+}

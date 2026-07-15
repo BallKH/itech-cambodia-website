@@ -17,7 +17,7 @@ import { state } from "./robot-state.js";
 import { audio } from "./robot-audio.js";
 import { createAnimator } from "./robot-animation.js";
 import { createSpeech } from "./robot-speech.js";
-import { buildProceduralRig, loadGlbRig, loadStaticGlbRig } from "./robot-rig.js";
+import { buildProceduralRig, loadGlbRig, loadStaticGlbRig, loadFlatPngRig } from "./robot-rig.js";
 import * as THREE from "./vendor/three.module.min.js";
 
 function injectStylesheet() {
@@ -45,6 +45,12 @@ async function createRig() {
       return await loadStaticGlbRig(THREE, `${CONFIG.model.staticGlbUrl}?v=${CONFIG.model.staticGlbVersion || 1}`);
     } catch (err) {
       console.warn(`[iTech Robot] Couldn't load ${CONFIG.model.staticGlbUrl} (${err.message}) — falling back to the procedural rig.`);
+    }
+  } else if (CONFIG.model.type === "flat-png") {
+    try {
+      return await loadFlatPngRig(THREE, `${CONFIG.model.spritePngUrl}?v=${CONFIG.model.spritePngVersion || 1}`);
+    } catch (err) {
+      console.warn(`[iTech Robot] Couldn't load ${CONFIG.model.spritePngUrl} (${err.message}) — falling back to the procedural rig.`);
     }
   }
   return buildProceduralRig(THREE);

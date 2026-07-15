@@ -12,11 +12,18 @@
 // robot-animation.js keeps working completely unchanged, because it only
 // ever touches `rig.bones.<name>`, never raw geometry.
 //
-// "static-glb" is the middle ground used today: a single fused (non-
-// rigged) .glb export — no per-part gestures possible (nothing to move
-// independently), but createAnimator() gives it a whole-body gesture set
-// built on the same floater/tilter wrappers every rig uses, so the public
-// API (wave/nod/celebrate/etc.) still works. Swap to a real rigged "glb"
+// "static-glb" is a single fused (non-rigged) .glb export — no per-part
+// gestures possible (nothing to move independently), but createAnimator()
+// gives it a whole-body gesture set built on the same floater/tilter
+// wrappers every rig uses, so the public API (wave/nod/celebrate/etc.)
+// still works. It depends on the .glb's material rendering correctly
+// under this scene's lights, though — see "flat-png" below.
+//
+// "flat-png" is used today: the flat reference art (background removed)
+// billboarded on a single unlit plane. Least "3D," but the most reliable —
+// MeshBasicMaterial ignores scene lighting entirely, so it always shows
+// exactly the PNG's own pixels, never a lit/washed-out render. Uses the
+// same whole-body gesture set as "static-glb". Swap to a real rigged "glb"
 // the moment one exists; nothing else changes.
 
 // The canonical bone/part names every renderer (procedural rig today, a
@@ -69,12 +76,18 @@ export const PART_TO_BONES = {
 
 export const CONFIG = {
   model: {
-    type: "static-glb", // "rig" (procedural) | "static-glb" (fused mesh, today) | "glb" (future rigged export)
+    type: "flat-png", // "rig" (procedural) | "flat-png" (billboarded art, today) | "static-glb" (fused mesh) | "glb" (future rigged export)
     glbUrl: "assets/robot.glb",
     staticGlbUrl: "assets/robot-static.glb",
     staticGlbVersion: 1,
-    // Reference-only: the flat mascot artwork the procedural rig's colors
-    // and proportions were sampled from. Not rendered once a glb is live.
+    // The flat mascot artwork with its background removed — rendered
+    // directly as an unlit billboard when model.type is "flat-png".
+    spritePngUrl: "assets/robot-mascot-sprite.png",
+    spritePngVersion: 1,
+    // Original, unprocessed reference art (opaque black background) — the
+    // procedural rig's colors/proportions were sampled from this. Not
+    // rendered directly; robot-mascot-sprite.png is the cutout derived
+    // from it.
     referencePng: "assets/Robot-V1.png",
   },
 
