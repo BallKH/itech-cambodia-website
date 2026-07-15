@@ -108,10 +108,11 @@ async function boot() {
   scene.add(floater);
 
   // Frame the camera around the rig's own measured size (never hand-tuned
-  // per pose). The rest-pose bounding box is much narrower than a raised or
-  // outstretched arm gets during a gesture, so the margin here is generous
-  // on purpose — retune only if a live check shows a gesture still clipping.
-  const span = Math.max(rig.boundingSize.x, rig.boundingSize.y) * 2.6;
+  // per pose). Kept tighter than before so the mascot reads big inside its
+  // small canvas instead of floating in empty space, while still leaving
+  // headroom for jump/celebrate's vertical root motion and a raised arm.
+  // Retune this one number first if a live check still shows clipping.
+  const span = Math.max(rig.boundingSize.x, rig.boundingSize.y) * 1.7;
   const dist = span / 2 / Math.tan((CONFIG.camera.fovDeg * Math.PI) / 360);
   camera.position.set(0, 0, dist);
   camera.lookAt(0, 0, 0);
