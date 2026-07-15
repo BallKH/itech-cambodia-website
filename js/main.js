@@ -48,6 +48,21 @@ document.addEventListener("DOMContentLoaded", () => {
     revealEls.forEach((el) => el.classList.add("in"));
   }
 
+  /* Pause background videos when off-screen (perf/battery) */
+  const bgVideos = document.querySelectorAll("video.about-video");
+  if ("IntersectionObserver" in window && bgVideos.length) {
+    const vio = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) entry.target.play().catch(() => {});
+          else entry.target.pause();
+        });
+      },
+      { threshold: 0.25 }
+    );
+    bgVideos.forEach((v) => vio.observe(v));
+  }
+
   /* Service tabs (services.html) */
   const tabs = document.querySelectorAll(".svc-tab");
   const panels = document.querySelectorAll(".svc-panel");
