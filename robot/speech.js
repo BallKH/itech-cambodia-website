@@ -1,10 +1,31 @@
-// iTech Cambodia — AI Robot Mascot — speech bubble, sound, confetti
-// Builds its own DOM (bubble + mute toggle), synthesizes short robotic tones
-// via Web Audio (no audio assets to ship), and reacts to section-change
-// events from state.js to stay contextually aware of what the visitor sees.
+// iTech Cambodia — AI Robot Mascot — speech bubble + text-to-speech
+// Builds its own DOM (bubble + mute toggle). Every spoken line shows in the
+// bubble immediately; the voice (SpeechSynthesis) only starts once audio has
+// been unlocked by a user gesture (see audio.js) — browsers block it before
+// that regardless, so this mirrors the same "no autoplay" rule for voice.
 
 import { CONFIG, prefersReducedMotion } from "./config.js";
 import { state } from "./state.js";
+import { on } from "./events.js";
+import { audio } from "./audio.js";
+
+let ttsVoice = null;
+function pickVoice() {
+  if (!window.speechSynthesis) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  for (const hint of CONFIG.tts.voiceNameHints) {
+    const match = voices.find((v) => v.name === hint);
+    if (match) return match;
+  }
+  return voices.find((v) => v.lang === CONFIG.tts.lang) || voices.find((v) => v.lang?.startsWith("en")) || voices[0];
+}
+if (window.speechSynthesis) {
+  ttsVoice = pickVoice();
+  window.speechSynthesis.onvoiceschanged = () => {
+    ttsVoice = pickVoice();
+  };
+}
 
 export function createSpeech(ctx) {
   const { container } = ctx;
@@ -18,7 +39,7 @@ export function createSpeech(ctx) {
   const muteBtn = document.createElement("button");
   muteBtn.type = "button";
   muteBtn.className = "itech-robot-mute";
-  muteBtn.setAttribute("aria-label", state.muted ? "Unmute robot sounds" : "Mute robot sounds");
+  muteBtn.setAttribute("aria-label", state.muted ? "Unmute robot voice" : "Mute robot voice");
   muteBtn.innerHTML = muteIcon(state.muted);
   container.appendChild(muteBtn);
 
@@ -27,7 +48,8 @@ export function createSpeech(ctx) {
     const next = !state.muted;
     state.setMuted(next);
     muteBtn.innerHTML = muteIcon(next);
-    muteBtn.setAttribute("aria-label", next ? "Unmute robot sounds" : "Mute robot sounds");
+    muteBtn.setAttribute("aria-label", next ? "Unmute robot voice" : "Mute robot voice");
+    if (next && window.speechSynthesis) window.speechSynthesis.cancel();
   });
 
   function muteIcon(muted) {
@@ -37,11 +59,26 @@ export function createSpeech(ctx) {
   }
 
   let hideTimer = null;
+
+  /** Cancels any in-progress utterance before starting the new one. */
+  function speakAloud(text) {
+    if (!CONFIG.tts.enabled || state.muted || !audio.isUnlocked() || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text.replace(/[\u{1F300}-\u{1FAFF}☀-➿]/gu, ""));
+    utter.lang = CONFIG.tts.lang;
+    utter.rate = CONFIG.tts.rate;
+    utter.pitch = CONFIG.tts.pitch;
+    utter.volume = CONFIG.tts.volume;
+    if (ttsVoice) utter.voice = ttsVoice;
+    window.speechSynthesis.speak(utter);
+  }
+
   function say(text, ms = CONFIG.timing.speechAutoHideMs) {
     bubble.textContent = text;
     bubble.classList.add("show");
     clearTimeout(hideTimer);
-    hideTimer = setTimeout(hide, ms);
+    if (ms > 0 && ms < 999999) hideTimer = setTimeout(hide, ms);
+    speakAloud(text);
   }
   function hide() {
     bubble.classList.remove("show");
@@ -49,61 +86,14 @@ export function createSpeech(ctx) {
 
   // ---------- section awareness ----------
   let lastSpokenAt = 0;
-  state.on("section", (e) => {
+  on("section", (e) => {
     const msg = CONFIG.sectionMessages[e.detail.id];
-    if (!msg) return;
+    if (!msg || state.asleep) return;
     const now = performance.now();
     if (now - lastSpokenAt < 4000) return;
     lastSpokenAt = now;
     say(msg);
   });
-
-  // ---------- synthesized sound ----------
-  let audioCtx = null;
-  const ensureAudio = () => {
-    if (audioCtx) return audioCtx;
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return null;
-    audioCtx = new AC();
-    return audioCtx;
-  };
-  const armAudioOnGesture = () => {
-    const resume = () => {
-      const ac = ensureAudio();
-      if (ac && ac.state === "suspended") ac.resume();
-      window.removeEventListener("pointerdown", resume);
-      window.removeEventListener("keydown", resume);
-    };
-    window.addEventListener("pointerdown", resume, { once: true });
-    window.addEventListener("keydown", resume, { once: true });
-  };
-  armAudioOnGesture();
-
-  function tone(freqStart, freqEnd, duration, type = "sine", delay = 0) {
-    if (state.muted) return;
-    const ac = ensureAudio();
-    if (!ac || ac.state === "suspended") return;
-    const t0 = ac.currentTime + delay;
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freqStart, t0);
-    osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd, 1), t0 + duration);
-    gain.gain.setValueAtTime(0.0001, t0);
-    gain.gain.exponentialRampToValueAtTime(CONFIG.sound.masterGain, t0 + duration * 0.25);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-    osc.connect(gain).connect(ac.destination);
-    osc.start(t0);
-    osc.stop(t0 + duration + 0.02);
-  }
-
-  const sound = {
-    hello: () => (tone(520, 780, 0.16, "sine"), tone(780, 980, 0.14, "sine", 0.15)),
-    beep: () => tone(880, 880, 0.09, "square"),
-    boop: () => tone(280, 220, 0.12, "sine"),
-    happy: () => (tone(660, 880, 0.1, "triangle"), tone(880, 1100, 0.12, "triangle", 0.1)),
-    thinking: () => tone(340, 300, 0.35, "sine"),
-  };
 
   // ---------- confetti (double-click celebration) ----------
   function confetti() {
@@ -151,5 +141,5 @@ export function createSpeech(ctx) {
     requestAnimationFrame(step);
   }
 
-  return { say, hide, sound, confetti };
+  return { say, hide, confetti };
 }

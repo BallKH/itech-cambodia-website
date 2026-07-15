@@ -6,8 +6,8 @@
   position: fixed;
   right: 24px;
   bottom: 90px; /* clears the site's .back-top button */
-  width: 150px;
-  height: 150px;
+  width: 140px;
+  height: 140px;
   z-index: 950;
   cursor: grab;
   touch-action: none;
@@ -27,12 +27,23 @@
   height: 100%;
 }
 
-@media (max-width: 720px) {
+/* Tablet */
+@media (max-width: 1024px) {
   .itech-robot {
-    width: 100px;
-    height: 100px;
+    width: 110px;
+    height: 110px;
+    right: 18px;
+    bottom: 84px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .itech-robot {
+    width: 90px;
+    height: 90px;
     right: 14px;
-    bottom: 78px;
+    bottom: 76px;
   }
 }
 

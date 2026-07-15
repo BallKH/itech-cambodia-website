@@ -1,16 +1,18 @@
 // iTech Cambodia — AI Robot Mascot — interaction layer
 // Pointer (mouse+touch+pen unified via Pointer Events), keyboard, raycasting
 // per body part, drag, double-click, long-press, hover-awareness on page
-// elements, scroll reaction, section awareness, and easter eggs.
+// elements, CTA click celebration, scroll reaction, section awareness,
+// idle-sleep/wake, and easter eggs.
 
 import * as THREE from "./vendor/three.module.min.js";
 import { CONFIG } from "./config.js";
 import { state } from "./state.js";
+import { audio } from "./audio.js";
 
 const gsap = window.gsap;
 const deg2rad = Math.PI / 180;
 
-export function createInteraction(ctx, animator, speaker) {
+export function createInteraction(ctx, animator, speaker, emotion) {
   const { renderer, camera, canvas, container, parts, hitMeshes } = ctx;
   const raycaster = new THREE.Raycaster();
   const pointerNDC = new THREE.Vector2();
@@ -39,20 +41,20 @@ export function createInteraction(ctx, animator, speaker) {
   }
 
   function reactToPart(part) {
-    if (animator.isBusy() || sitting) return;
+    if (animator.isBusy() || sitting || state.asleep) return;
     const now = performance.now();
     switch (part) {
       case "head":
         animator.nod();
         break;
-      case "face":
-        animator.faceExpression(["smile", "surprised", "laugh"][Math.floor(Math.random() * 3)]);
+      case "eyes":
+        [animator.wink, animator.happyEyes, animator.surprisedEyes][Math.floor(Math.random() * 3)]();
         break;
       case "armL":
         if (now - lastArmClickAt.R < CONFIG.easterEggs.bothArmsWindowMs) {
           animator.clap();
         } else {
-          [animator.wave, animator.thumbsUp, () => animator.pointTo(-1)][Math.floor(Math.random() * 3)]();
+          animator.wave();
         }
         lastArmClickAt.L = now;
         break;
@@ -60,22 +62,28 @@ export function createInteraction(ctx, animator, speaker) {
         if (now - lastArmClickAt.L < CONFIG.easterEggs.bothArmsWindowMs) {
           animator.clap();
         } else {
-          [animator.wave, animator.thumbsUp, () => animator.pointTo(1)][Math.floor(Math.random() * 3)]();
+          animator.thumbsUp();
         }
         lastArmClickAt.R = now;
         break;
       case "legL":
-        [() => animator.kick("L"), () => animator.liftFoot("L"), animator.dance][Math.floor(Math.random() * 3)]();
+        animator.liftFoot("L");
         break;
       case "legR":
-        [() => animator.kick("R"), () => animator.liftFoot("R"), animator.dance][Math.floor(Math.random() * 3)]();
+        animator.liftFoot("R");
+        break;
+      case "footL":
+      case "footR":
+        animator.hop();
         break;
       case "body":
-        [animator.giggleBounce, animator.spinBody][Math.floor(Math.random() * 2)]();
+        animator.giggleBounce();
+        emotion.set("excited", { autoRevertMs: 1400 });
         break;
       case "tablet": {
         const topic = CONFIG.hologramTopics[Math.floor(Math.random() * CONFIG.hologramTopics.length)];
         animator.showHologram(topic, 2600);
+        emotion.set("thinking", { autoRevertMs: 2600 });
         speaker.say(`Showing ${topic.toUpperCase()} overview`, 2200);
         break;
       }
@@ -86,6 +94,7 @@ export function createInteraction(ctx, animator, speaker) {
 
   function onPointerDown(e) {
     if (e.button !== undefined && e.button !== 0 && e.pointerType === "mouse") return;
+    state.markActivity();
     pointerDown = true;
     dragging = false;
     downX = e.clientX;
@@ -144,7 +153,10 @@ export function createInteraction(ctx, animator, speaker) {
     lastPointerUpAt = now;
 
     if (isDoubleClick) {
+      if (state.asleep) return;
       animator.celebrate(() => speaker.confetti());
+      emotion.set("excited", { autoRevertMs: 1800 });
+      audio.happy();
       speaker.say("Yay! 🎉", 2200);
       return;
     }
@@ -156,6 +168,8 @@ export function createInteraction(ctx, animator, speaker) {
     if (count === CONFIG.easterEggs.clickCount) {
       setTimeout(() => {
         animator.dance();
+        emotion.set("excited", { autoRevertMs: 2000 });
+        audio.yay();
         speaker.say("Whee! You found my dance! 🕺", 2600);
       }, 500);
     }
@@ -173,10 +187,12 @@ export function createInteraction(ctx, animator, speaker) {
   window.addEventListener("pointercancel", onPointerCancel);
 
   // ---------- global cursor follow ("approaches" + idle random look) ----------
+  // Head/eyes only, capped at CONFIG.cursorFollow.maxAngleDeg — see animation.js.
   let cursorRaf = null;
   window.addEventListener(
     "pointermove",
     (e) => {
+      state.markActivity();
       if (cursorRaf) return;
       cursorRaf = requestAnimationFrame(() => {
         cursorRaf = null;
@@ -186,8 +202,8 @@ export function createInteraction(ctx, animator, speaker) {
         const dx = e.clientX - cx;
         const dy = e.clientY - cy;
         const dist = Math.hypot(dx, dy);
-        const approachRadius = 420;
-        if (dist < approachRadius && !animator.isBusy() && !sitting) {
+        const approachRadius = CONFIG.cursorFollow.approachRadiusPx;
+        if (dist < approachRadius && !animator.isBusy() && !sitting && !state.asleep) {
           state.setCursor(dx, dy, true);
           animator.lookAt(Math.max(-1, Math.min(1, dx / approachRadius)), Math.max(-1, Math.min(1, dy / approachRadius)));
         } else if (state.cursor.active) {
@@ -201,6 +217,7 @@ export function createInteraction(ctx, animator, speaker) {
 
   // ---------- keyboard accessibility ----------
   container.addEventListener("keydown", (e) => {
+    state.markActivity();
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       if (!animator.isBusy()) {
@@ -215,6 +232,7 @@ export function createInteraction(ctx, animator, speaker) {
   // ---------- Konami code (global) ----------
   let konamiIdx = 0;
   window.addEventListener("keydown", (e) => {
+    state.markActivity();
     const seq = CONFIG.easterEggs.konamiSequence;
     const expected = seq[konamiIdx];
     const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -224,6 +242,7 @@ export function createInteraction(ctx, animator, speaker) {
         konamiIdx = 0;
         state.triggerSuperhero();
         animator.superheroTransform();
+        emotion.set("excited", { autoRevertMs: 3000 });
         speaker.say("Superhero mode activated! 🦸", 3200);
       }
     } else {
@@ -235,8 +254,9 @@ export function createInteraction(ctx, animator, speaker) {
   document.addEventListener(
     "pointerover",
     (e) => {
-      const target = e.target.closest?.(CONFIG.hoverAwareness.selectors);
-      if (!target || animator.isBusy() || sitting) return;
+      const cta = e.target.closest?.(CONFIG.ctaSelectors);
+      const target = cta || e.target.closest?.(CONFIG.hoverAwareness.selectors);
+      if (!target || animator.isBusy() || sitting || state.asleep) return;
       const now = performance.now();
       if (now - lastPointCooldown < 1200) return;
       lastPointCooldown = now;
@@ -245,6 +265,27 @@ export function createInteraction(ctx, animator, speaker) {
       const targetRect = target.getBoundingClientRect();
       const targetCx = targetRect.left + targetRect.width / 2;
       animator.pointTo(targetCx < robotCx ? -1 : 1);
+      if (cta) emotion.set("listening", { autoRevertMs: 1600 });
+    },
+    { passive: true }
+  );
+
+  // ---------- CTA click celebration (non-blocking — never hijacks navigation) ----------
+  // Form submit buttons are excluded here: a click doesn't mean success (the
+  // form could fail validation or the request could error) — the contact
+  // form instead calls window.iTechRobot.celebrate() itself on a real 201,
+  // see js/main.js. This handler covers plain navigational CTAs.
+  document.addEventListener(
+    "click",
+    (e) => {
+      const cta = e.target.closest?.(CONFIG.ctaSelectors);
+      if (!cta || cta.matches('button[type="submit"]') || state.asleep) return;
+      state.markActivity();
+      if (!animator.isBusy()) {
+        animator.celebrate(() => speaker.confetti());
+        emotion.set("excited", { autoRevertMs: 1800 });
+        audio.success();
+      }
     },
     { passive: true }
   );
@@ -255,16 +296,19 @@ export function createInteraction(ctx, animator, speaker) {
   window.addEventListener(
     "scroll",
     () => {
+      state.markActivity();
       const y = window.scrollY;
       const dir = y > lastScrollY ? 1 : -1;
       lastScrollY = y;
-      if (!animator.isBusy() && !sitting && !state.cursor.active) {
+      if (!animator.isBusy() && !sitting && !state.asleep && !state.cursor.active) {
         animator.lookAt(0, dir * 0.35);
       }
       clearTimeout(scrollEndTimer);
       scrollEndTimer = setTimeout(() => {
-        if (!animator.isBusy() && !sitting && !state.cursor.active) animator.returnHeadToRest(0.7);
-        if (Math.random() < 0.12 && !animator.isBusy() && !sitting) animator.pointTo(dir);
+        if (!animator.isBusy() && !sitting && !state.asleep && !state.cursor.active) animator.returnHeadToRest(0.7);
+        // Reading the About page: point toward the page content a little more often.
+        const pointChance = state.currentSection === "about" ? 0.25 : 0.12;
+        if (Math.random() < pointChance && !animator.isBusy() && !sitting && !state.asleep) animator.pointTo(dir);
       }, 180);
     },
     { passive: true }
@@ -288,12 +332,21 @@ export function createInteraction(ctx, animator, speaker) {
     sections.forEach((s) => io.observe(s));
   }
 
+  // ---------- idle-sleep / wake ----------
+  const sleepCheckInterval = setInterval(() => {
+    if (state.asleep || animator.isBusy() || sitting) return;
+    if (performance.now() - state.lastActivityAt > CONFIG.timing.idleSleepMs) {
+      state.markAsleep();
+    }
+  }, 2000);
+
   return {
     destroy() {
       canvas.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointercancel", onPointerCancel);
+      clearInterval(sleepCheckInterval);
     },
   };
 }

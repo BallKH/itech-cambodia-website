@@ -21,17 +21,22 @@ export const CONFIG = {
     shadow: 0x0e1f3d, // brand navy, used for contact shadow tint
   },
 
+  // Mirrored in robot/css/robot.css media queries — keep both in sync.
   size: {
-    desktop: 150, // px, canvas square (within 120-180 spec range)
-    mobile: 100, // px (within 80-120 spec range)
-    mobileBreakpoint: 720,
+    desktop: 140, // px, canvas square
+    tablet: 110, // px, <= tabletBreakpoint
+    mobile: 90, // px, <= mobileBreakpoint
+    tabletBreakpoint: 1024,
+    mobileBreakpoint: 600,
   },
 
   position: {
     right: 24,
     bottom: 90, // clears the site's .back-top button (46px + 24px + gap)
+    rightTablet: 18,
+    bottomTablet: 84,
     rightMobile: 14,
-    bottomMobile: 78,
+    bottomMobile: 76,
   },
 
   camera: {
@@ -52,32 +57,42 @@ export const CONFIG = {
     blinkMaxMs: 6500,
     headTurnMinMs: 4000,
     headTurnMaxMs: 9000,
-    randomEventMinMs: 30000,
-    randomEventMaxMs: 90000,
+    headTiltMinMs: 6000,
+    headTiltMaxMs: 14000,
+    bodySwayPeriodMs: 5200,
+    randomEventMinMs: 20000,
+    randomEventMaxMs: 60000,
     greetingDelayMs: 900,
-    speechAutoHideMs: 4200,
+    speechAutoHideMs: 5000,
     longPressMs: 650,
     doubleClickWindowMs: 320,
     tenClickWindowMs: 5000,
+    idleSleepMs: 50000, // no pointer/keyboard/scroll activity -> robot dozes off
+    dwellThankYouMs: 60000, // cumulative time on site this session -> thank-you line
+  },
+
+  // Cursor / scroll head-follow is capped well below gesture rotation ranges
+  // so it always reads as "glancing," never as the robot spinning its head off.
+  cursorFollow: {
+    maxAngleDeg: 15,
+    approachRadiusPx: 420,
   },
 
   greetings: [
     "Hello 👋",
     "Welcome to iTech Cambodia",
-    "Need IT consultation?",
-    "How may I help you?",
+    "Need help finding the right IT solution?",
   ],
 
-  // Section-awareness: element id -> spoken line. Matched against
-  // <section id="..."> ancestors and data-robot-section attributes.
+  // Section-awareness: matched against data-robot-section attributes.
   sectionMessages: {
     hero: "Welcome to iTech Cambodia! 👋",
-    about: "Our certified engineers design and manage secure IT.",
+    about: "Let me introduce our company — certified engineers you can trust.",
     services: "We provide cloud, virtualization, and cybersecurity.",
-    partners: "We work with world-class technology partners.",
+    partners: "Thanks to our world-class technology partners.",
     customers: "Trusted across Cambodia's leading businesses.",
     projects: "Our implementation experience runs deep.",
-    contact: "Let's build something together.",
+    contact: "Let's build something together — I'd love to help.",
   },
 
   workingActions: [
@@ -94,13 +109,16 @@ export const CONFIG = {
     "wave",
     "stretch",
     "smile",
+    "checkTablet",
     "drinkCoffee",
-    "holdWrench",
-    "showShield",
-    "launchHologram",
     "repairServer",
-    "flyDrone",
-    "scanPage",
+    "launchHologram",
+    "showShield",
+    "showCloudIcon",
+    "showAiIcon",
+    "dance",
+    "thumbsUp",
+    "lookAtVisitor",
   ],
 
   hologramTopics: ["cloud", "security", "ai", "server", "network"],
@@ -118,11 +136,29 @@ export const CONFIG = {
   sound: {
     enabledByDefault: true,
     storageKey: "itech-robot-muted",
-    masterGain: 0.06,
+    masterGain: 0.2, // ~20% — small, cute, never annoying
+  },
+
+  // SpeechSynthesis (TTS). Never speaks before the first user gesture unlocks
+  // audio — see audio.js. Bubble text still shows immediately regardless.
+  tts: {
+    enabled: true,
+    lang: "en-US",
+    rate: 1.02,
+    pitch: 1.08,
+    volume: 0.85,
+    voiceNameHints: ["Google US English", "Samantha", "Microsoft Aria", "Microsoft Jenny"],
   },
 
   hoverAwareness: {
     selectors: ".btn, .card, .pillar-card, .customer-card, .value-row, .svc-tab, .partner-logo",
+  },
+  ctaSelectors: ".btn-primary",
+
+  session: {
+    greetedKey: "itech-robot-greeted",
+    startKey: "itech-robot-session-start",
+    thankedKey: "itech-robot-thanked",
   },
 
   a11y: {

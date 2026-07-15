@@ -12,9 +12,12 @@
 import * as THREE from "./vendor/three.module.min.js";
 import { CONFIG } from "./config.js";
 import { state } from "./state.js";
+import { on } from "./events.js";
+import { audio } from "./audio.js";
 import { createAnimator } from "./animation.js";
 import { createInteraction } from "./interaction.js";
 import { createSpeech } from "./speech.js";
+import { createEmotion } from "./emotion.js";
 
 function makeShadowTexture() {
   const size = 64;
@@ -171,11 +174,14 @@ function buildRobot() {
   head.add(headHit);
   hitMeshes.push(headHit);
 
-  const faceHit = new THREE.Mesh(new THREE.CircleGeometry(0.3, 12), invisible());
-  faceHit.position.set(0, -0.03, 0.39);
-  faceHit.userData.part = "face";
-  head.add(faceHit);
-  hitMeshes.push(faceHit);
+  // Tighter than the old full-face disc — sits right over the eye/visor band
+  // so "eyes" (wink/happy/surprised) and "head" (nod/blink/smile) are two
+  // genuinely distinct clickable zones instead of overlapping.
+  const eyesHit = new THREE.Mesh(new THREE.CircleGeometry(0.2, 12), invisible());
+  eyesHit.position.set(0, -0.01, 0.395);
+  eyesHit.userData.part = "eyes";
+  head.add(eyesHit);
+  hitMeshes.push(eyesHit);
 
   // ---- arms ----
   function buildArm(sign) {
@@ -230,11 +236,18 @@ function buildRobot() {
     const foot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.22), matPrimary());
     foot.position.set(0, -0.33, 0.04);
     hip.add(foot);
-    const legHit = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.32, 4, 8), invisible());
-    legHit.position.y = -0.2;
+    // Shin/upper-leg zone (lift leg) stops short of the foot pad below it.
+    const legHit = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.2, 4, 8), invisible());
+    legHit.position.y = -0.13;
     legHit.userData.part = sign < 0 ? "legL" : "legR";
     hip.add(legHit);
     hitMeshes.push(legHit);
+    // Foot pad zone (jump) is a separate, smaller region at the very bottom.
+    const footHit = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.28), invisible());
+    footHit.position.set(0, -0.33, 0.04);
+    footHit.userData.part = sign < 0 ? "footL" : "footR";
+    hip.add(footHit);
+    hitMeshes.push(footHit);
     return hip;
   }
   const legL = buildLeg(-1);
@@ -416,7 +429,8 @@ async function boot() {
 
   const animator = createAnimator(ctx);
   const speaker = createSpeech(ctx);
-  const interactionCtl = createInteraction(ctx, animator, speaker);
+  const emotion = createEmotion(animator);
+  const interactionCtl = createInteraction(ctx, animator, speaker, emotion);
 
   function resize() {
     const rect = container.getBoundingClientRect();
@@ -451,11 +465,39 @@ async function boot() {
 
   animator.start();
 
-  setTimeout(() => {
-    animator.greetWave();
-    speaker.say(CONFIG.greetings[Math.floor(Math.random() * CONFIG.greetings.length)]);
-    speaker.sound.hello();
-  }, CONFIG.timing.greetingDelayMs);
+  // ---------- greeting: once per visitor session, not every page load ----------
+  const session = readSessionFlags();
+  if (!session.greeted) {
+    setTimeout(() => {
+      animator.greetWave();
+      speaker.say(CONFIG.greetings[Math.floor(Math.random() * CONFIG.greetings.length)]);
+      audio.hello();
+      writeSessionFlag(CONFIG.session.greetedKey);
+    }, CONFIG.timing.greetingDelayMs);
+  }
+
+  // ---------- "thanks for visiting" after 60s cumulative time on site ----------
+  if (!session.thanked) {
+    const elapsed = Date.now() - session.start;
+    const remaining = Math.max(0, CONFIG.timing.dwellThankYouMs - elapsed);
+    setTimeout(() => {
+      if (readSessionFlags().thanked || state.asleep) return;
+      speaker.say("Thanks for visiting iTech Cambodia. 🙏");
+      writeSessionFlag(CONFIG.session.thankedKey);
+    }, remaining);
+  }
+
+  // ---------- sleep / wake (idle-timeout bonus feature) ----------
+  on("sleep", () => {
+    emotion.set("sleeping");
+    speaker.say("💤", 999999);
+  });
+  on("wake", () => {
+    // emotion.set() below transitions out of "sleeping" via its own leave()
+    // hook, which already calls animator.wakePose() — no need to call it here.
+    emotion.set("waiting");
+    speaker.hide();
+  });
 
   // ---------- public API + plugin system for future LLM/AI-employee integration ----------
   const plugins = new Map();
@@ -465,9 +507,11 @@ async function boot() {
     mute: (v) => state.setMuted(v !== undefined ? v : !state.muted),
     isMuted: () => state.muted,
     setMood: (name) => animator.setExpression(name),
+    setEmotion: (name, opts) => emotion.set(name, opts),
+    getEmotion: () => emotion.get(),
     wave: () => animator.wave(),
     nod: () => animator.nod(),
-    celebrate: () => (animator.celebrate(() => speaker.confetti()), speaker.sound.happy()),
+    celebrate: () => (animator.celebrate(() => speaker.confetti()), audio.yay()),
     showHologram: (topic, ms) => animator.showHologram(topic, ms),
     navigateTo: (url) => {
       window.location.href = url;
@@ -475,7 +519,7 @@ async function boot() {
     registerPlugin(name, plugin) {
       plugins.set(name, plugin);
       if (typeof plugin.onInit === "function") {
-        plugin.onInit({ animator, speaker, state, ctx });
+        plugin.onInit({ animator, speaker, emotion, state, ctx });
       }
       return () => plugins.delete(name);
     },
@@ -490,6 +534,33 @@ async function boot() {
   };
 
   container.dispatchEvent(new CustomEvent("itech-robot:ready", { bubbles: true }));
+}
+
+/** sessionStorage is per-tab and persists across page navigations within it —
+ * exactly what "once per visitor session" and "60s cumulative on site" need. */
+function readSessionFlags() {
+  try {
+    let start = Number(sessionStorage.getItem(CONFIG.session.startKey));
+    if (!start) {
+      start = Date.now();
+      sessionStorage.setItem(CONFIG.session.startKey, String(start));
+    }
+    return {
+      start,
+      greeted: sessionStorage.getItem(CONFIG.session.greetedKey) === "1",
+      thanked: sessionStorage.getItem(CONFIG.session.thankedKey) === "1",
+    };
+  } catch {
+    return { start: Date.now(), greeted: false, thanked: false };
+  }
+}
+
+function writeSessionFlag(key) {
+  try {
+    sessionStorage.setItem(key, "1");
+  } catch {
+    /* private-mode storage may throw — non-fatal, just re-greets next load */
+  }
 }
 
 function scheduleBoot() {

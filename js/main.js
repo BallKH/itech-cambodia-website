@@ -114,6 +114,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         successEl?.classList.add("show");
         form.reset();
+        window.iTechRobot?.celebrate();
       } catch (err) {
         if (errorEl) {
           errorEl.textContent = "Something went wrong sending your message. Please try again, or email us directly at sales@itechcambodia.com.";
