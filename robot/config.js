@@ -12,19 +12,22 @@
 // robot-animation.js keeps working completely unchanged, because it only
 // ever touches `rig.bones.<name>`, never raw geometry.
 //
-// "static-glb" is a single fused (non-rigged) .glb export — no per-part
-// gestures possible (nothing to move independently), but createAnimator()
-// gives it a whole-body gesture set built on the same floater/tilter
-// wrappers every rig uses, so the public API (wave/nod/celebrate/etc.)
-// still works. It depends on the .glb's material rendering correctly
-// under this scene's lights, though — see "flat-png" below.
+// "static-glb" is the default today: a single fused (non-rigged) .glb
+// export, rendered with OrbitControls for free drag-rotate + wheel-zoom
+// directly on the mascot. No per-part gestures possible (nothing to move
+// independently), but createAnimator() gives it a whole-body gesture set
+// built on the same floater/tilter wrappers every rig uses, so the public
+// API (wave/nod/celebrate/etc.) still works. robot.js loads its unlit
+// texture as a MeshBasicMaterial so scene lighting can't wash it out, and
+// runs a one-time post-render sanity check that swaps to "flat-png"
+// automatically if the render still comes out blank.
 //
-// "flat-png" is used today: the flat reference art (background removed)
-// billboarded on a single unlit plane. Least "3D," but the most reliable —
-// MeshBasicMaterial ignores scene lighting entirely, so it always shows
-// exactly the PNG's own pixels, never a lit/washed-out render. Uses the
-// same whole-body gesture set as "static-glb". Swap to a real rigged "glb"
-// the moment one exists; nothing else changes.
+// "flat-png" is the automatic (and manually selectable) fallback: the flat
+// reference art (background removed) billboarded on a single unlit plane.
+// Least "3D," but the most reliable — MeshBasicMaterial ignores scene
+// lighting entirely, so it always shows exactly the PNG's own pixels.
+// Uses the same whole-body gesture set as "static-glb". Swap to a real
+// rigged "glb" the moment one exists; nothing else changes.
 
 // The canonical bone/part names every renderer (procedural rig today, a
 // loaded .glb tomorrow) must expose on `rig.bones`. robot-animation.js and
@@ -76,7 +79,7 @@ export const PART_TO_BONES = {
 
 export const CONFIG = {
   model: {
-    type: "flat-png", // "rig" (procedural) | "flat-png" (billboarded art, today) | "static-glb" (fused mesh) | "glb" (future rigged export)
+    type: "static-glb", // "rig" (procedural) | "flat-png" (billboarded art) | "static-glb" (interactive fused mesh, today) | "glb" (future rigged export)
     glbUrl: "assets/robot.glb",
     staticGlbUrl: "assets/robot-static.glb",
     staticGlbVersion: 1,

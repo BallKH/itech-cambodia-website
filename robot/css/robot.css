@@ -29,6 +29,7 @@
   width: 100%;
   aspect-ratio: 1 / 1;
   filter: drop-shadow(0 10px 14px rgba(14, 31, 61, 0.28));
+  transition: transform 0.25s ease, filter 0.25s ease;
 }
 .itech-robot-canvas-host canvas {
   display: block;
@@ -36,6 +37,49 @@
   height: 100%;
   cursor: pointer;
   touch-action: none;
+}
+
+/* ---------- hover: slight scale-up + glow ---------- */
+.itech-robot:hover .itech-robot-canvas-host,
+.itech-robot:focus-visible .itech-robot-canvas-host {
+  transform: scale(1.08);
+  filter: drop-shadow(0 10px 14px rgba(14, 31, 61, 0.28)) drop-shadow(0 0 16px rgba(62, 198, 255, 0.65));
+}
+
+/* ---------- active orbit-drag: grabbing cursor instead of pointer ---------- */
+.itech-robot--dragging .itech-robot-canvas-host canvas {
+  cursor: grabbing;
+}
+
+/* ---------- loading placeholder, shown until the first confirmed-good
+   render (see robot.js's blank-render sanity check) ---------- */
+.itech-robot-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+.itech-robot-loading::before {
+  content: "";
+  width: 32%;
+  height: 32%;
+  border-radius: 50%;
+  border: 3px solid rgba(62, 198, 255, 0.25);
+  border-top-color: #3ec6ff;
+  animation: itech-robot-spin 0.85s linear infinite;
+}
+.itech-robot:not(.itech-robot--loading) .itech-robot-loading {
+  opacity: 0;
+}
+@keyframes itech-robot-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ---------- hologram popup (tablet reaction) ---------- */
@@ -140,4 +184,6 @@
 @media (prefers-reduced-motion: reduce) {
   .itech-robot-bubble { transition: opacity 0.12s linear; transform: none !important; }
   .itech-robot-hologram.show { animation: none; }
+  .itech-robot-canvas-host { transition: none; }
+  .itech-robot-loading::before { animation: none; }
 }

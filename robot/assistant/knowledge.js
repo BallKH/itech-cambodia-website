@@ -13,6 +13,31 @@ export function isOutOfScope(results) {
   return !results.length || results[0].score < ASSISTANT_CONFIG.search.relevanceThreshold;
 }
 
+// Small talk ("hi", "how are you", "good morning"...) is made entirely of
+// search.js stopwords, so it always reduces to zero query tokens and would
+// otherwise land on the exact same generic decline as a real off-topic
+// question (e.g. "what's the weather") — which reads as broken, not
+// intentional. Checked only once a query is already out-of-scope, so it
+// never shadows a real question that happens to start with "hi" (e.g. "hi,
+// do you offer VMware support?" still searches normally).
+const GREETING_PATTERNS = [
+  /^(hi|hello|hey|yo|greetings|sup)\b/i,
+  /how('?s| is| are)?\s*(it going|things|you doing|you)\b/i,
+  /\bgood (morning|afternoon|evening|day)\b/i,
+  /what'?s up\b/i,
+  /\bwho are you\b/i,
+];
+
+export function isGreeting(text) {
+  return GREETING_PATTERNS.some((re) => re.test((text || "").trim()));
+}
+
+export const GREETING_REPLIES = [
+  "Hey there! I'm doing great, thanks for asking. I'm the iTech Cambodia assistant — ask me about our services, cloud, cybersecurity, or how to get in touch.",
+  "Hello! 👋 I'm here to help you explore iTech Cambodia — try asking about our services, partners, or reaching our team.",
+  "Hi! I'm an AI assistant for iTech Cambodia's website. Ask me about IT infrastructure, cloud & data center, or cybersecurity solutions.",
+];
+
 export function buildContext(results) {
   return results
     .map((r, i) => {

@@ -415,6 +415,7 @@ export async function loadStaticGlbRig(THREE, url) {
   // and wash the paint out to a flat white silhouette. Swapping to
   // MeshBasicMaterial makes the mesh fully unlit — it always shows exactly
   // the texture pixels, immune to whatever lighting the scene has.
+  let paintedMeshCount = 0;
   loaded.traverse((obj) => {
     if (!obj.isMesh) return;
     obj.userData.part = "torso"; // any click -> a generic whole-body reaction
@@ -423,8 +424,16 @@ export async function loadStaticGlbRig(THREE, url) {
     if (paint) {
       obj.material = new THREE.MeshBasicMaterial({ map: paint, side: src.side });
       src.dispose();
+      paintedMeshCount += 1;
     }
   });
+  // No baked texture on any mesh means every material stayed a lit
+  // MeshStandardMaterial with a zeroed baseColor — i.e. it would render as
+  // a flat, near-white silhouette. Throw so the caller (robot.js) falls
+  // back to the PNG mascot instead of shipping that broken render.
+  if (paintedMeshCount === 0) {
+    throw new Error(`${url} has no emissive/base color texture on any mesh — nothing to paint the mesh with`);
+  }
 
   // The export's own origin is whatever Blender's object origin happened
   // to be (often the feet, or an arbitrary point) — recenter the same way

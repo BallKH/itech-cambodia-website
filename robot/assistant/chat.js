@@ -10,13 +10,17 @@
 import { ASSISTANT_CONFIG } from "./assistant-config.js";
 import { getIndex } from "./website-index.js";
 import { search } from "./search.js";
-import { buildContext, buildCandidates, isOutOfScope } from "./knowledge.js";
+import { buildContext, buildCandidates, isOutOfScope, isGreeting, GREETING_REPLIES } from "./knowledge.js";
 import { runAction, actionFromSearchResult } from "./actions.js";
 import { getHistory, pushTurn } from "./memory.js";
 import { logger } from "./logger.js";
 
 const OUT_OF_SCOPE_REPLY =
-  "I'm here to help you explore this website and answer questions about our company, services, and solutions.";
+  "I can only help with questions about iTech Cambodia — our services, solutions, partners, or how to reach us. Try asking about cloud & data center, cybersecurity, networking, or SAP, for example.";
+
+function pickGreetingReply() {
+  return GREETING_REPLIES[Math.floor(Math.random() * GREETING_REPLIES.length)];
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -124,10 +128,11 @@ export async function ask(query, opts = {}) {
   const results = search(trimmed, index);
 
   if (isOutOfScope(results)) {
+    const reply = isGreeting(trimmed) ? pickGreetingReply() : OUT_OF_SCOPE_REPLY;
     pushTurn("user", trimmed);
-    pushTurn("assistant", OUT_OF_SCOPE_REPLY);
-    opts.onDelta?.(OUT_OF_SCOPE_REPLY);
-    return { reply: OUT_OF_SCOPE_REPLY, action: null };
+    pushTurn("assistant", reply);
+    opts.onDelta?.(reply);
+    return { reply, action: null };
   }
 
   let result;
