@@ -221,6 +221,17 @@ async function boot() {
   controls.enablePan = false;
   controls.rotateSpeed = 0.9;
   controls.zoomSpeed = 0.8;
+  // A chibi mascot in a 140px canvas has nowhere to hide a bad angle: get
+  // too close and a 32°-FOV camera turns it into a distorted eyeball
+  // close-up; tip toward a steep top-down/bottom-up angle and the same
+  // close-up happens regardless of zoom distance, because the nearest
+  // point (the top of the head) fills the frame under perspective. Both
+  // were reproduced live with a wide polar range — this keeps the camera
+  // in a comfortable "eye-level-ish" band so every reachable view still
+  // reads as the character, while still allowing full 360° horizontal
+  // rotation and real zoom.
+  controls.minPolarAngle = Math.PI * 0.32; // ~58°, well short of overhead
+  controls.maxPolarAngle = Math.PI * 0.68; // ~122°, well short of underneath
   let orbitActive = false;
   controls.addEventListener("start", () => {
     orbitActive = true;
@@ -250,8 +261,12 @@ async function boot() {
     camera.position.set(0, 0, dist);
     camera.lookAt(0, 0, 0);
     controls.target.set(0, 0, 0);
-    controls.minDistance = dist * 0.55;
-    controls.maxDistance = dist * 2.2;
+    // Floor kept close to the default framing distance — the earlier 0.55x
+    // let visitors dolly in far enough to turn the mascot into a distorted,
+    // unrecognizable close-up. 0.85x still gives real zoom without losing
+    // the character.
+    controls.minDistance = dist * 0.85;
+    controls.maxDistance = dist * 1.8;
     controls.update();
   }
   mountRig(initialRig);
